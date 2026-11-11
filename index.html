@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Suntech Maintenance App</title>
+<meta name="description" content="PM checklist, Vacuum pump monitor และนับ stock part">
+<meta name="theme-color" content="#0f2f2a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Suntech Maint">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header>
+  <div class="hrow">
+    <h1>Suntech Maintenance App</h1>
+    <span id="net" class="net" role="status" aria-live="polite">…</span>
+  </div>
+  <p>เลือกงานที่ต้องการ</p>
+</header>
+
+<div id="update" class="banner" hidden>
+  มีเวอร์ชันใหม่ <button id="btnUpdate" type="button">อัปเดต</button>
+</div>
+
+<main>
+  <a class="card soon" style="--c:var(--pm)" aria-disabled="true">
+    <div class="ico" aria-hidden="true">&#10003;</div>
+    <div><p class="t">PM checklist</p><p class="d">ตรวจเช็คเครื่องตามแผนรายเดือน</p></div>
+    <span class="badge">กำลังย้าย</span>
+  </a>
+  <a class="card soon" style="--c:var(--pump)" aria-disabled="true">
+    <div class="ico" aria-hidden="true">&#9881;</div>
+    <div><p class="t">Vacuum pump monitor</p><p class="d">สถานะ pump ตาม S/N และประวัติการซ่อม</p></div>
+    <span class="badge">กำลังย้าย</span>
+  </a>
+  <a class="card soon" style="--c:var(--stock)" aria-disabled="true">
+    <div class="ico" aria-hidden="true">&#9638;</div>
+    <div><p class="t">นับ stock part</p><p class="d">นับยอด part คงเหลือรายเดือน</p></div>
+    <span class="badge">กำลังย้าย</span>
+  </a>
+
+  <section class="test" aria-labelledby="testH">
+    <h2 id="testH">ทดสอบการใช้งานแบบ offline</h2>
+    <ol class="steps">
+      <li id="s1">ติดตั้งแอปลงเครื่อง <span class="ok" id="ok1"></span></li>
+      <li id="s2">เก็บตัวแอปไว้ในเครื่องแล้ว <span class="ok" id="ok2"></span></li>
+      <li>ปิด WiFi / เน็ตมือถือ แล้วปิด-เปิดแอปใหม่ ต้องยังเห็นหน้านี้</li>
+      <li>กดปุ่มด้านล่างตอนไม่มีเน็ต แล้วปิด-เปิดแอป ตัวเลขต้องยังอยู่</li>
+    </ol>
+    <div class="counter">
+      <button id="btnTap" type="button">บันทึกในเครื่อง +1</button>
+      <span>บันทึกแล้ว <b id="tapN">0</b> ครั้ง</span>
+      <button id="btnReset" type="button" class="ghost">ล้าง</button>
+    </div>
+    <div id="install" class="install" hidden></div>
+  </section>
+</main>
+
+<footer>
+  <span id="ver">version …</span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
