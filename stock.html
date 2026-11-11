@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>นับ stock part</title>
+<meta name="theme-color" content="#0f2f2a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="stock.css">
+</head>
+<body>
+<header>
+  <a class="back" href="./">&#8592; เมนูหลัก</a>
+  <div class="titlebar"><h1>นับ stock part</h1><button class="hbtn" id="hNext" type="button" hidden>Confirm (0)</button></div>
+  <div class="sync">
+    <span id="net" class="pill" role="status" aria-live="polite">…</span>
+    <span id="pending" class="pill wait" hidden></span>
+    <span id="asof" style="opacity:.75"></span>
+    <button id="bSync" type="button" hidden>ส่งตอนนี้</button>
+  </div>
+  <div class="who"><label for="name">ผู้นับ</label><input id="name" placeholder="ชื่อผู้นับ" autocomplete="name"></div>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="t-count" aria-selected="true">นับ stock</button>
+    <button role="tab" id="t-review" aria-selected="false">Review เดือนนี้</button>
+  </div>
+</header>
+
+<main>
+  <div id="loading" class="empty">กำลังโหลดรายการ part…</div>
+  <div id="error" class="err" hidden></div>
+
+  <section id="v-count" hidden>
+    <div class="filters">
+      <div class="chips" id="lineChips"></div>
+      <div class="chips" id="clsChips"></div>
+      <input class="search" id="q" type="search" placeholder="ค้นหาชื่อ / model / Part ID">
+    </div>
+    <div class="hint" id="countHint"></div>
+    <div id="list"></div>
+  </section>
+
+  <section id="v-confirm" hidden>
+    <div class="hint">ตรวจยอดก่อนส่ง — ใส่หมายเหตุได้ถ้ายอดต่างจากเดือนก่อน · ถ้าไม่มีเน็ต ระบบเก็บไว้ในเครื่องแล้วส่งเองเมื่อมีสัญญาณ</div>
+    <div id="confList"></div>
+  </section>
+
+  <section id="v-review" hidden>
+    <div class="filters">
+      <div style="display:flex;gap:8px;align-items:center"><label for="month">เดือน</label><select id="month"></select></div>
+      <div class="chips" id="rLineChips"></div>
+      <div class="chips" id="rClsChips"></div>
+    </div>
+    <div class="note" id="reviewNote"></div>
+    <div class="kpis" id="kpis"></div>
+    <div id="reviewTable"></div>
+  </section>
+</main>
+
+<footer id="fCount">
+  <div class="info" id="fInfo">ยังไม่ได้กรอก</div>
+  <button class="btn" id="bCancel" type="button">Cancel</button>
+  <button class="btn primary" id="bNext" type="button" disabled>Confirm</button>
+</footer>
+<footer id="fConfirm" hidden>
+  <button class="btn" id="bBack" type="button">กลับไปแก้</button>
+  <div class="info"></div>
+  <button class="btn primary" id="bSend" type="button">ยืนยันส่ง</button>
+</footer>
+
+<div class="pinwrap" id="pinWrap" hidden>
+  <form class="pinbox" id="pinForm">
+    <h2>ใส่ PIN ของเครื่อง</h2>
+    <p>ใส่ครั้งเดียว เครื่องจะจำไว้ (ขอ PIN จากหัวหน้างาน)</p>
+    <input id="pinIn" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN">
+    <div class="pinerr" id="pinErr" role="alert"></div>
+    <div class="row"><button class="btn primary" type="submit" id="pinOk">ตกลง</button></div>
+  </form>
+</div>
+
+<script src="config.js"></script>
+<script src="store.js"></script>
+<script src="api.js"></script>
+<script src="stock.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>

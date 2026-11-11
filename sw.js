@@ -3,7 +3,7 @@
  * เปลี่ยน VERSION ทุกครั้งที่แก้ไฟล์ในรายการ SHELL เพื่อให้เครื่องผู้ใช้ได้เวอร์ชันใหม่
  * (ข้อมูลจาก Google Sheets จะไม่ถูก cache ที่นี่ — จะเก็บใน IndexedDB ของแอปแทน)
  */
-const VERSION = 'v1.0.0-shell.1';
+const VERSION = 'v1.0.0-stock.1';
 const CACHE = 'suntech-maint-' + VERSION;
 const SHELL = [
   './',
@@ -11,6 +11,12 @@ const SHELL = [
   './app.css',
   './app.js',
   './manifest.webmanifest',
+  './stock.html',
+  './stock.css',
+  './stock.js',
+  './config.js',
+  './store.js',
+  './api.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/maskable-512.png',
@@ -45,10 +51,10 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put('./index.html', copy));
+        if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
         return res;
-      }).catch(() => caches.match('./index.html'))
+      }).catch(() => caches.match(req, { ignoreSearch: true })
+        .then((hit) => hit || caches.match(url.pathname.endsWith('/') ? './' : './index.html')))
     );
     return;
   }
