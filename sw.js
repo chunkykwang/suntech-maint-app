@@ -3,7 +3,7 @@
  * เปลี่ยน VERSION ทุกครั้งที่แก้ไฟล์ในรายการ SHELL เพื่อให้เครื่องผู้ใช้ได้เวอร์ชันใหม่
  * (ข้อมูลจาก Google Sheets จะไม่ถูก cache ที่นี่ — จะเก็บใน IndexedDB ของแอปแทน)
  */
-const VERSION = 'v1.0.0-stock.1';
+const VERSION = 'v1.0.0-stock.2';
 const CACHE = 'suntech-maint-' + VERSION;
 const SHELL = [
   './',
@@ -11,6 +11,7 @@ const SHELL = [
   './app.css',
   './app.js',
   './manifest.webmanifest',
+  './photo-test.html',
   './stock.html',
   './stock.css',
   './stock.js',
@@ -46,6 +47,7 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;          // API / Google ไม่ผ่าน cache นี้
+  if (url.pathname.indexOf('/test-img/') >= 0) return;      // รูปทดสอบ: ให้หน้า photo-test เก็บเองใน IndexedDB
 
   // หน้า HTML: ลองเน็ตก่อน (ได้ของใหม่) ถ้าไม่มีเน็ตใช้ของในเครื่อง
   if (req.mode === 'navigate') {

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ทดสอบรูป offline</title>
+<meta name="theme-color" content="#0f2f2a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="app.css">
+<style>
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .box h2{font-size:15px;margin:0 0 6px}
+  .box p{font-size:13px;color:var(--muted);margin:0 0 10px;line-height:1.6}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row button{border:0;border-radius:10px;background:var(--pm);color:#fff;padding:12px 14px;font:inherit;font-weight:700;min-height:46px}
+  .row button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+  .row button:disabled{opacity:.5}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:12px}
+  .grid figure{margin:0;background:var(--bg);border-radius:8px;overflow:hidden}
+  .grid img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
+  .grid figcaption{font-size:11px;color:var(--muted);padding:4px 6px}
+  .log{font-size:12px;color:var(--muted);margin-top:8px;white-space:pre-line}
+  .back{color:#cfe0dc;text-decoration:none;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <a class="back" href="./">&#8592; เมนูหลัก</a>
+  <div class="hrow" style="margin-top:6px"><h1>ทดสอบรูป offline</h1><span id="net" class="net">…</span></div>
+  <p>โหลดรูปเก็บในเครื่องตอนมีเน็ต แล้วเปิดดูตอนไม่มีเน็ต</p>
+</header>
+<main>
+  <section class="box">
+    <h2>A. รูปตัวอย่าง (ไม่ต้องใช้ API)</h2>
+    <p>รูปทดสอบ 4 รูป รูปละ ~120 KB ขนาดใกล้เคียงรูป Hint จริง ทดสอบว่า iPhone เก็บรูปไว้ในเครื่องและเปิดตอน offline ได้</p>
+    <div class="row">
+      <button id="aLoad" type="button">โหลดเก็บในเครื่อง</button>
+      <button id="aClear" type="button" class="ghost">ลบรูปในเครื่อง</button>
+    </div>
+    <div class="log" id="aLog"></div>
+    <div class="grid" id="aGrid"></div>
+  </section>
+
+  <section class="box">
+    <h2>B. รูป part จริง (ผ่าน API + PIN)</h2>
+    <p>ดึงรูปจากโฟลเดอร์ Partlist › Photos ผ่าน Apps Script ต้องตั้งลิงก์ API แล้วและมี PIN</p>
+    <div class="row">
+      <button id="bLoad" type="button">โหลดรูป part เก็บในเครื่อง</button>
+      <button id="bClear" type="button" class="ghost">ลบรูปในเครื่อง</button>
+    </div>
+    <div class="log" id="bLog"></div>
+    <div class="grid" id="bGrid"></div>
+  </section>
+
+  <section class="box">
+    <h2>ขั้นทดสอบ</h2>
+    <p>1) เปิดจากไอคอนบนหน้าจอโฮม ตอนมีเน็ต → กด "โหลดเก็บในเครื่อง" ให้รูปขึ้นครบ<br>
+       2) เปิดโหมดเครื่องบิน → ปัดปิดแอป → เปิดใหม่จากไอคอน → เข้าหน้านี้<br>
+       3) <b>ผ่าน</b> = รูปยังขึ้นครบ และป้าย "ที่เก็บในเครื่อง" มีตัวเลข</p>
+    <div class="log" id="sLog"></div>
+  </section>
+</main>
+<footer><span id="ver"></span></footer>
+
+<script src="config.js"></script>
+<script src="store.js"></script>
+<script src="api.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var SAMPLES = ['test-img/sample1.jpg', 'test-img/sample2.jpg', 'test-img/sample3.jpg', 'test-img/sample4.jpg'];
+
+  function net() { $('net').textContent = navigator.onLine ? 'ออนไลน์' : 'ออฟไลน์'; $('net').classList.toggle('off', !navigator.onLine); }
+  window.addEventListener('online', net); window.addEventListener('offline', net); net();
+
+  function toDataUrl(blob) {
+    return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(r.result); }; r.onerror = rej; r.readAsDataURL(blob); });
+  }
+  function kb(n) { return (n / 1024).toFixed(0) + ' KB'; }
+  function paint(gridId, map, caption) {
+    var g = $(gridId); g.innerHTML = '';
+    Object.keys(map || {}).forEach(function (k) {
+      if (!map[k]) return;
+      var f = document.createElement('figure');
+      f.innerHTML = '<img alt="" src="' + map[k] + '"><figcaption>' + (caption ? caption(k) : k) + '</figcaption>';
+      g.appendChild(f);
+    });
+  }
+  function storage() {
+    var out = [];
+    var done = function () { $('sLog').textContent = out.join('\n'); };
+    if (navigator.storage && navigator.storage.estimate) {
+      navigator.storage.estimate().then(function (e) {
+        out.push('ที่เก็บในเครื่อง: ใช้ ' + (e.usage / 1048576).toFixed(1) + ' MB จากที่ให้ได้ ~' + (e.quota / 1048576).toFixed(0) + ' MB');
+        return navigator.storage.persisted ? navigator.storage.persisted() : null;
+      }).then(function (p) { if (p !== null) out.push('เก็บถาวร (ไม่ถูกลบอัตโนมัติ): ' + (p ? 'ใช่' : 'ยังไม่ได้รับสิทธิ์')); done(); }, done);
+    } else { out.push('เบราว์เซอร์นี้ไม่บอกขนาดที่เก็บ'); done(); }
+  }
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
+
+  /* ---------- A: รูปตัวอย่าง ---------- */
+  function showA() { Store.get('test.samples').then(function (m) { paint('aGrid', m); $('aLog').textContent = m ? 'มีในเครื่อง ' + Object.keys(m).length + ' รูป' : 'ยังไม่มีรูปในเครื่อง'; storage(); }); }
+  $('aLoad').onclick = function () {
+    var btn = this; btn.disabled = true; $('aLog').textContent = 'กำลังโหลด…';
+    var map = {}, total = 0;
+    Promise.all(SAMPLES.map(function (u) {
+      return fetch(u + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(u + ' ' + r.status); return r.blob(); })
+        .then(function (b) { total += b.size; return toDataUrl(b); }).then(function (d) { map[u.split('/').pop()] = d; });
+    })).then(function () { return Store.set('test.samples', map); })
+      .then(function () { btn.disabled = false; showA(); $('aLog').textContent = 'เก็บแล้ว ' + Object.keys(map).length + ' รูป (' + kb(total) + ')'; },
+            function (e) { btn.disabled = false; $('aLog').textContent = 'โหลดไม่ได้: ' + e.message + (navigator.onLine ? '' : ' — ตอนนี้ออฟไลน์'); });
+  };
+  $('aClear').onclick = function () { Store.del('test.samples').then(showA); };
+
+  /* ---------- B: รูป part จริงผ่าน API ---------- */
+  function showB() { Store.get('stock.photos').then(function (m) { paint('bGrid', m, function () { return 'part photo'; }); $('bLog').textContent = m && Object.keys(m).length ? 'มีในเครื่อง ' + Object.keys(m).length + ' รูป' : 'ยังไม่มีรูปในเครื่อง'; }); }
+  $('bLoad').onclick = function () {
+    var btn = this;
+    if (!Api.ready()) { $('bLog').textContent = 'ยังไม่ได้ตั้งลิงก์ API (config.js)'; return; }
+    if (!Api.pin()) { var p = prompt('ใส่ PIN ของเครื่อง'); if (!p) return; Api.setPin(p.trim()); }
+    btn.disabled = true; $('bLog').textContent = 'กำลังดึงรายการ part…';
+    Api.call('stock.init').then(function (d) {
+      var ids = uniq(d.parts.map(function (p) { return p.photo; }).filter(Boolean));
+      $('bLog').textContent = 'พบรูป ' + ids.length + ' รูป กำลังโหลด…';
+      var map = {}, chunks = [];
+      for (var i = 0; i < ids.length; i += 20) chunks.push(ids.slice(i, i + 20));
+      return chunks.reduce(function (pr, c) {
+        return pr.then(function () { return Api.call('stock.photos', { ids: c }).then(function (m) { Object.assign(map, m); $('bLog').textContent = 'โหลดแล้ว ' + Object.keys(map).length + '/' + ids.length; }); });
+      }, Promise.resolve()).then(function () { return Store.set('stock.photos', map); });
+    }).then(function () { btn.disabled = false; showB(); storage(); },
+            function (e) { btn.disabled = false; if (e.code === 'PIN') Api.clearPin(); $('bLog').textContent = 'ไม่สำเร็จ: ' + e.message; });
+  };
+  $('bClear').onclick = function () { Store.del('stock.photos').then(showB); };
+  function uniq(a) { var o = []; a.forEach(function (x) { if (o.indexOf(x) < 0) o.push(x); }); return o; }
+
+  showA(); showB();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+})();
+</script>
+</body>
+</html>
