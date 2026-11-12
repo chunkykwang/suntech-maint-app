@@ -3,7 +3,7 @@
  * เปลี่ยน VERSION ทุกครั้งที่แก้ไฟล์ในรายการ SHELL เพื่อให้เครื่องผู้ใช้ได้เวอร์ชันใหม่
  * (ข้อมูลจาก Google Sheets จะไม่ถูก cache ที่นี่ — จะเก็บใน IndexedDB ของแอปแทน)
  */
-const VERSION = 'v1.0.0-stock.2';
+const VERSION = 'v1.0.0-stock.3';
 const CACHE = 'suntech-maint-' + VERSION;
 const SHELL = [
   './',
