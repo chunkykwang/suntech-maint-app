@@ -16,7 +16,7 @@
 | `config.js` | ลิงก์ API (Apps Script Web app) — ห้ามใส่ PIN |
 | `api.js` / `store.js` | เรียก API / เก็บข้อมูลและคิวรอส่งในเครื่อง (IndexedDB) |
 | `stock.html` / `stock.js` / `stock.css` | นับ stock part (offline ได้) |
-| `repair.html` / `repair.js` / `repair.css` | แจ้งซ่อม: ใบใหม่ / งานรอปิด / ใบแจ้งซ่อมที่ส่งแล้ว (ดูรายละเอียดทั้งใบ) / จ่ายงาน (admin) · offline ได้ · ลิงก์ไฟล์ Drive มาจาก `sheetUrl` ใน `repair.init` |
+| `repair.html` / `repair.js` / `repair.css` | แจ้งซ่อม: ใบใหม่ / งานรอปิด / ใบแจ้งซ่อมที่ส่งแล้ว (ดูรายละเอียดทั้งใบ) / จ่ายงาน (admin) · offline ได้ · ลิงก์ไฟล์ Drive มาจาก `sheetUrl` ใน `repair.init` · admin เห็นทุกใบจาก action `repair.list` |
 | `pm.html` / `pm-shim.js` | PM checklist: หน้าเดิมของ v0 + ตัวเก็บข้อมูล/รูปในเครื่อง + คิวรอส่งผล (offline ได้) |
 | `pump.html` | Vacuum pump monitor (ดูอย่างเดียว, offline ได้, ไม่มีข้อมูล PAIS) |
 | `sw.js` | เก็บตัวแอปไว้ในเครื่องให้เปิดได้ตอน offline — **เปลี่ยน `VERSION` ทุกครั้งที่แก้ไฟล์** |

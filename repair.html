@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="repair.css?v=20261116b">
+<link rel="stylesheet" href="repair.css?v=20261116c">
 </head>
 <body>
 <header>
@@ -95,7 +95,9 @@
   <section id="v-list" hidden>
     <div class="vt"><button type="button" class="link" data-menu>&#8592; เมนู</button><h2>ใบแจ้งซ่อมที่ส่งแล้ว</h2></div>
     <div class="drive" data-drive></div>
-    <p class="note">ใบที่ทำจากเครื่องนี้ 30 ใบล่าสุด · แตะที่ใบเพื่อดูรายละเอียดและคัดลอกข้อความ LINE</p>
+    <p class="note" id="listNote"></p>
+    <div class="admbar" id="admBar" hidden><span id="admStat" role="status" aria-live="polite"></span><button type="button" class="btn ghost" id="bReload">โหลดใหม่</button></div>
+    <input id="q" type="search" class="search" placeholder="ค้นหา เลขที่ใบ / เครื่อง / ช่าง / อาการ / วันที่" aria-label="ค้นหาใบแจ้งซ่อม">
     <div id="list"></div>
   </section>
 
@@ -117,11 +119,11 @@
 </div>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=20261116b"></script>
-<script src="store.js?v=20261116b"></script>
-<script src="session.js?v=20261116b"></script>
-<script src="api.js?v=20261116b"></script>
-<script src="repair.js?v=20261116b"></script>
+<script src="config.js?v=20261116c"></script>
+<script src="store.js?v=20261116c"></script>
+<script src="session.js?v=20261116c"></script>
+<script src="api.js?v=20261116c"></script>
+<script src="repair.js?v=20261116c"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>

@@ -5,6 +5,7 @@
  * ใบแจ้งซ่อม/การจ่ายงาน เข้าคิว 'repair.outbox' แล้วส่งเองเมื่อมีเน็ต — ส่งซ้ำไม่บันทึกซ้ำ (submitId)
  * ใบที่ส่งแล้ว 30 ใบล่าสุดเก็บใน 'repair.sent' (ข้อมูลทั้งใบ + ข้อความ LINE + ลิงก์รูป)
  * ลิงก์ไฟล์ใน Drive มาจาก repair.init (sheetUrl) — ไม่ใส่ ID ไฟล์ไว้ใน repo
+ * admin เห็นใบแจ้งซ่อมทุกใบ (ทุกคน ทุกเครื่อง) จาก action 'repair.list' เก็บในเครื่องที่ 'repair.all' ไว้ดูตอน offline
  */
 (function () {
   'use strict';
@@ -13,6 +14,7 @@
   var OTHER = 'อื่นๆ (ระบุ)', ADMIN = Session.ADMIN;
   var M = null, OUTBOX = [], SENT = [], JOBS = [], photos = { p1: null, p2: null }, syncing = false;
   var USER = Session.user(), MODE = 'new', JOB = null, VIEW = '', DETAIL = null;
+  var ALL = [], ALL_AT = '', ALL_ERR = '', ALL_LOADING = false;   // admin: ใบแจ้งซ่อมทุกใบจากเซิร์ฟเวอร์ (repair.list)
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -64,6 +66,7 @@
   function boot() {
     Promise.all([Store.get('repair.init'), Store.get('repair.outbox'), Store.get('repair.sent'), Store.get('repair.jobs')]).then(function (r) {
       OUTBOX = r[1] || []; SENT = r[2] || []; JOBS = r[3] || [];
+      Store.get('repair.all').then(function (a) { if (a && a.rows) { ALL = a.rows; ALL_AT = a.at || ''; } }).catch(function () {});
       if (r[0]) use(r[0]);
       paint();
       var go = function () { refresh(); sync(); };
@@ -335,21 +338,64 @@
     return Store.set('repair.sent', SENT);
   }
   function slim(r) { var o = Object.assign({}, r); o.hasP1 = !!r.p1; o.hasP2 = !!r.p2; delete o.p1; delete o.p2; return o; }
+  /* admin: ใบแจ้งซ่อมทุกใบจาก Repair_Log */
+  var COLS = { 'Report ID': 'id', 'Submitted at': 'sub', 'Technician': 'tech', 'Date': 'date', 'Start time': 't1', 'Finish time': 't2',
+    'Downtime (hr)': 'hr', 'Machine type': 'type', 'Equipment No.': 'eq', 'Description': 'desc', 'Site': 'site', 'Model': 'model',
+    'Serial no.': 'sn', 'Problem reported': 'pb', 'Sector': 'sec', 'Cause of problem': 'cause', 'Reason': 'reason', 'Solution': 'sol',
+    'Submit ID': 'submitId', 'Job ID': 'jobId' };
+  function fromServer(o) {
+    var r = {};
+    Object.keys(COLS).forEach(function (h) { r[COLS[h]] = o[h] == null ? '' : String(o[h]); });
+    var hr = parseFloat(r.hr); r.hr = isNaN(hr) ? '' : hr.toFixed(2); r.mins = isNaN(hr) ? '' : Math.round(hr * 60);
+    var L = { p1: o['Photo - problem'] || '', p2: o['Photo - solution'] || '' };
+    r.hasP1 = !!L.p1; r.hasP2 = !!L.p2;
+    return { submitId: r.submitId || r.id, id: r.id, eq: r.eq, at: r.sub, sent: true, rec: r, links: L, text: lineText(r, L), server: true };
+  }
+  function loadAll(force) {
+    if (!isAdmin() || ALL_LOADING) return;
+    if (!navigator.onLine) { ALL_ERR = 'ออฟไลน์ — แสดงข้อมูลที่โหลดไว้ล่าสุด'; if (VIEW === 'list') renderList(); return; }
+    if (!force && ALL_AT && Date.now() - ALL_AT.t < 60000) return;
+    ALL_LOADING = true; if (VIEW === 'list') renderList();
+    call('repair.list', { adminPw: Session.adminPw(), limit: 300 }, 60000).then(function (rows) {
+      ALL = (rows || []).map(fromServer); ALL_AT = { t: Date.now(), s: stamp().d + ' ' + stamp().hm }; ALL_ERR = '';
+      Store.set('repair.all', { rows: ALL, at: ALL_AT }).catch(function () {});
+    }, function (er) {
+      ALL_ERR = /action|ไม่รู้จัก|unknown/i.test(er.message || '') ? 'เซิร์ฟเวอร์ยังไม่รองรับการดูทุกใบ (repair.list) — ต้องเพิ่มโค้ดใน Apps Script'
+        : er.code === 'ADMIN' ? 'รหัส admin ใช้ไม่ได้ — ออกจากระบบแล้วเข้าเป็น admin ใหม่' : 'โหลดใบทั้งหมดไม่ได้: ' + er.message;
+    }).then(function () { ALL_LOADING = false; if (VIEW === 'list') renderList(); if (VIEW === 'detail') renderDetail(); });
+  }
+  function listItems() {
+    if (!isAdmin()) return SENT;
+    var seen = {}, out = [];
+    SENT.forEach(function (s) { if (!s.sent) { out.push(s); seen[s.submitId] = 1; seen[s.id] = 1; } });   // รอส่งจากเครื่องนี้ ขึ้นก่อน
+    ALL.forEach(function (s) { if (!seen[s.submitId] && !seen[s.id]) { out.push(s); seen[s.submitId] = 1; seen[s.id] = 1; } });
+    SENT.forEach(function (s) { if (!seen[s.submitId] && !seen[s.id]) out.push(s); });                     // จ่ายงาน / ใบที่ยังไม่อยู่ในรายการเซิร์ฟเวอร์
+    return out;
+  }
   function renderList() {
-    var box = $('list');
-    if (!SENT.length) { box.innerHTML = '<div class="empty">ยังไม่มีใบจากเครื่องนี้</div>'; return; }
-    box.innerHTML = SENT.map(function (s, i) {
+    var box = $('list'), adm = isAdmin();
+    $('listNote').textContent = adm ? 'admin: ใบแจ้งซ่อมทุกใบของทุกคน (300 ใบล่าสุด) · แตะที่ใบเพื่อดูรายละเอียดและคัดลอกข้อความ LINE'
+      : 'ใบที่ทำจากเครื่องนี้ 30 ใบล่าสุด · แตะที่ใบเพื่อดูรายละเอียดและคัดลอกข้อความ LINE';
+    $('admBar').hidden = !adm;
+    if (adm) $('admStat').textContent = ALL_LOADING ? 'กำลังโหลดใบทั้งหมด…' : ALL_ERR ? ALL_ERR : ALL_AT ? 'อัปเดตล่าสุด ' + ALL_AT.s + ' · ' + ALL.length + ' ใบ' : '';
+    var q = ($('q').value || '').trim().toLowerCase(), L = listItems();
+    var F = !q ? L : L.filter(function (s) { var r = s.rec || {}; return [s.id, s.eq, r.tech, r.desc, r.pb, r.date, r.sec, r.jobId].join(' ').toLowerCase().indexOf(q) >= 0; });
+    if (!L.length) { box.innerHTML = '<div class="empty">' + (adm && ALL_LOADING ? 'กำลังโหลด…' : 'ยังไม่มีใบแจ้งซ่อม') + '</div>'; return; }
+    if (!F.length) { box.innerHTML = '<div class="empty">ไม่พบใบที่ตรงกับ “' + esc(q) + '”</div>'; return; }
+    box.innerHTML = F.map(function (s) {
       var wait = !s.sent, r = s.rec || {}, asg = r.kind === 'assign';
-      return '<button type="button" class="item rowbtn' + (wait ? ' wait' : '') + '" data-open="' + i + '">' +
+      return '<button type="button" class="item rowbtn' + (wait ? ' wait' : '') + '" data-open="' + esc(s.submitId) + '">' +
         '<div class="top"><b>' + esc(s.id) + '</b><span class="st">' + (asg ? 'จ่ายงาน · ' : '') + (wait ? 'รอส่ง' + (s.hasPhoto ? ' (มีรูป)' : '') : 'ส่งแล้ว') + '</span></div>' +
         '<div class="meta">' + esc(s.eq) + (r.desc ? ' · ' + esc(r.desc) : '') + '</div>' +
-        '<div class="meta">' + esc(r.tech || '') + (s.at ? ' · ' + esc(s.at) : '') + '</div>' +
+        '<div class="meta">' + esc(r.tech || '') + (r.date ? ' · วันที่ ' + esc(r.date) : '') + (r.jobId ? ' · ' + esc(r.jobId) : '') + '</div>' +
         (r.pb ? '<div class="pbl">' + esc(r.pb) + '</div>' : '') + '</button>';
     }).join('');
     box.querySelectorAll('[data-open]').forEach(function (b) {
-      b.onclick = function () { DETAIL = SENT[b.dataset.open].submitId; show('detail'); };
+      b.onclick = function () { DETAIL = b.dataset.open; show('detail'); };
     });
   }
+  $('q').addEventListener('input', function () { renderList(); });
+  $('bReload').onclick = function () { loadAll(true); };
   function val(label, v, full) {
     return '<div class="f' + (full ? ' full' : '') + '"><label>' + esc(label) + '</label><div class="val">' + (v ? esc(v) : '<span class="opt">—</span>') + '</div></div>';
   }
@@ -361,7 +407,7 @@
     return '<div class="f"><label>' + esc(label) + '</label><div class="pic">' + inner + act + '</div></div>';
   }
   function renderDetail() {
-    var s = SENT.filter(function (x) { return x.submitId === DETAIL; })[0], box = $('detail');
+    var s = listItems().filter(function (x) { return x.submitId === DETAIL; })[0], box = $('detail');
     if (!s) { show('list'); return; }
     var r = s.rec, asg = r && r.kind === 'assign', q = OUTBOX.filter(function (x) { return x.submitId === s.submitId; })[0] || {}, L = s.links || {};
     $('dTitle').textContent = s.id;
@@ -387,12 +433,14 @@
         val('Reason', r.reason) + val('Solution', r.sol) +
         picBox('Picture of solution', L.p2, q.p2, r.hasP2) + '</section>';
     }
-    html += '<section class="card"><h2>ข้อความ LINE</h2><pre class="ltext">' + esc(s.text) + '</pre><div class="acts">' +
+    html += '<section class="card"><h2>ข้อความสำหรับ LINE</h2><div class="lbox"><textarea id="dText" readonly aria-label="ข้อความสำหรับ LINE">' + esc(s.text) + '</textarea></div><div class="acts">' +
       '<button type="button" class="btn line" id="dCopy">คัดลอกข้อความ</button>' +
       (navigator.share ? '<button type="button" class="btn ghost" id="dShare">แชร์ไป LINE</button>' : '') + '</div></section>';
     box.innerHTML = html;
+    var ta = $('dText'); ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 4) + 'px';
     $('dCopy').onclick = function () {
-      (navigator.clipboard ? navigator.clipboard.writeText(s.text) : Promise.reject()).then(function () { toast('คัดลอกแล้ว วางใน LINE ได้เลย'); }, function () { toast('กดค้างที่ข้อความแล้วเลือกคัดลอก'); });
+      (navigator.clipboard ? navigator.clipboard.writeText(s.text) : Promise.reject()).then(function () { toast('คัดลอกแล้ว วางใน LINE ได้เลย'); },
+        function () { var t = $('dText'); t.focus(); t.select(); try { document.execCommand('copy'); toast('คัดลอกแล้ว วางใน LINE ได้เลย'); } catch (_) { toast('กดค้างที่ข้อความแล้วเลือกคัดลอก'); } });
     };
     if ($('dShare')) $('dShare').onclick = function () { navigator.share({ text: s.text }).catch(function () {}); };
   }
@@ -414,6 +462,7 @@
       }).then(function () {
         if (assign && !JOBS.some(function (j) { return j.jobId === r.jobId; })) JOBS.push({ jobId: r.jobId, at: r.at, by: r.by, tech: r.tech, date: r.date, t1: r.t1, type: r.type, eq: r.eq, desc: r.desc, pb: r.pb });
         if (!assign && r.jobId) JOBS = JOBS.filter(function (j) { return j.jobId !== r.jobId; });
+        if (!assign && isAdmin()) { ALL_AT = ''; if (VIEW === 'list' || VIEW === 'detail') setTimeout(function () { loadAll(true); }, 0); }
         Store.set('repair.jobs', JOBS);
         syncing = false; paint(); if (VIEW === 'list') renderList(); if (VIEW === 'detail') renderDetail(); if (VIEW === 'jobs') renderJobs();
         var id = assign ? r.jobId : r.id;
@@ -432,7 +481,7 @@
     VIEW = v;
     $('v-menu').hidden = v !== 'menu';
     $('frm').hidden = v !== 'form'; $('v-list').hidden = v !== 'list'; $('v-jobs').hidden = v !== 'jobs'; $('v-detail').hidden = v !== 'detail';
-    if (v === 'list') renderList();
+    if (v === 'list') { renderList(); loadAll(); }
     if (v === 'detail') renderDetail();
     if (v === 'jobs') { renderJobs(); refreshJobs(); }
     paint();
