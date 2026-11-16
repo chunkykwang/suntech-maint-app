@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f2f2a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<base target="_top">
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: plant-floor status board — header, 3 tabs (which pump to use / monitor installed / supplier performance) */
+:root{
+  --bg:#eef0ee; --panel:#ffffff; --ink:#1b2321; --muted:#5d6a66; --line:#d4dad7;
+  --accent:#2b5d52; --accent-bg:#dcebe7;
+  --avoid:#b42318; --avoid-bg:#fde8e6;
+  --watch:#a15c07; --watch-bg:#fdf0d5;
+  --ok:#1f7a45; --ok-bg:#e1f3e8;
+  --font-body:"IBM Plex Sans Thai",Tahoma,"Leelawadee UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111715; --panel:#1a2220; --ink:#e6ebe9; --muted:#9aa8a3; --line:#2c3633;
+  --accent:#7fc2b1; --accent-bg:#1d3631;
+  --avoid:#ff8a7f; --avoid-bg:#3a1a17; --watch:#f2b45a; --watch-bg:#35270f; --ok:#6fd39a; --ok-bg:#15301f;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111715; --panel:#1a2220; --ink:#e6ebe9; --muted:#9aa8a3; --line:#2c3633;
+  --accent:#7fc2b1; --accent-bg:#1d3631;
+  --avoid:#ff8a7f; --avoid-bg:#3a1a17; --watch:#f2b45a; --watch-bg:#35270f; --ok:#6fd39a; --ok-bg:#15301f;
+  color-scheme:dark}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:8px 20px}
+h1{margin:0;font-size:clamp(22px,3.2vw,30px);font-weight:700;text-wrap:balance;line-height:1.2}
+h2{margin:0;font-size:18px;font-weight:700}
+h3{margin:0;font-size:15px;font-weight:700}
+.sub{color:var(--muted);font-size:14px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit}
+
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--ink);overflow-x:auto}
+.tab{all:unset;cursor:pointer;padding:10px 16px 8px;border-radius:6px 6px 0 0;font-weight:600;color:var(--muted);white-space:nowrap;display:flex;gap:8px;align-items:baseline;border:1px solid transparent;border-bottom:0}
+.tab b{font-family:var(--font-mono);font-size:13px;font-weight:600}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.view{display:grid;gap:16px}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:grid;gap:12px;min-width:0}
+.phead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
+
+/* search */
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+#q{flex:1 1 280px;min-width:0;font-size:20px;padding:10px 14px;border:2px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font-family:var(--font-mono)}
+#q:focus{outline:none;border-color:var(--accent)}
+.btn{padding:10px 14px;border:1px solid var(--line);background:var(--panel);border-radius:6px;cursor:pointer}
+.hit{border:2px solid var(--c);background:var(--cb);border-radius:8px;padding:14px 16px;display:grid;gap:4px}
+.hit .big{font-size:clamp(22px,3vw,28px);font-weight:700;color:var(--c)}
+
+/* pick list */
+.picks{display:grid;gap:10px}
+.pick{display:grid;grid-template-columns:56px minmax(0,1fr);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:8px;background:var(--panel)}
+.pick .rank{display:grid;place-items:center;font-family:var(--font-mono);font-size:30px;font-weight:600;color:var(--c);border-right:1px solid var(--line)}
+.pick .body{padding:12px 14px;display:grid;gap:8px;min-width:0}
+.pick .top{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center}
+.pick .snbig{font-family:var(--font-mono);font-size:24px;font-weight:600}
+.pick .do{font-weight:600}
+.pick .meta{display:flex;flex-wrap:wrap;gap:4px 20px;font-size:13px;color:var(--muted)}
+.pick .meta b{color:var(--ink);font-weight:600}
+.ready{font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid currentColor}
+.ready.y{color:var(--ok)} .ready.n{color:var(--watch)}
+.warranty{font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-bg);padding:2px 8px;border-radius:4px}
+.linkbtn{all:unset;cursor:pointer;color:var(--accent);font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.linkbtn:focus-visible{outline:2px solid var(--accent)}
+
+.pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.pipe-col{border:1px solid var(--line);border-top:4px solid var(--sc);border-radius:6px;padding:10px 12px;display:grid;gap:6px;align-content:start;background:var(--bg)}
+.pipe-col .h{display:flex;justify-content:space-between;align-items:baseline}
+.pipe-col .h b{font-family:var(--font-mono);font-size:24px;color:var(--sc)}
+.pipe-item{display:flex;justify-content:space-between;gap:8px;font-size:13px;border-top:1px dashed var(--line);padding-top:5px}
+.pipe-item code{font-family:var(--font-mono);font-weight:600}
+.s-hand{--sc:var(--ok)} .s-vend{--sc:var(--watch)} .s-wait{--sc:var(--avoid)} .s-mia{--sc:var(--avoid)} .s-unk{--sc:var(--muted)} .s-inst{--sc:var(--accent)}
+
+/* pill + rows */
+.pill{justify-self:start;font-size:13px;font-weight:700;padding:2px 10px;border-radius:999px;background:var(--cb);color:var(--c);white-space:nowrap}
+.dots{display:inline-flex;gap:3px;flex-wrap:wrap;vertical-align:middle}
+.dots i{width:11px;height:11px;border-radius:2px;background:var(--c)}
+.dots i.e{background:var(--line)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font-size:13px;font-weight:600;cursor:pointer;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:transparent}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.list{display:grid;gap:6px}
+.row{background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--c);border-radius:6px}
+.row>button{all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:grid;grid-template-columns:minmax(120px,1fr) 120px 1.3fr 1.3fr 20px;gap:12px;align-items:center;padding:10px 14px}
+.row>button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.sn{font-family:var(--font-mono);font-size:18px;font-weight:600;overflow-wrap:anywhere}
+.alias{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.count{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px;color:var(--muted)}
+.where{font-size:14px;min-width:0}
+.where .st{font-weight:600}
+.where .loc{color:var(--muted);display:block;font-size:13px}
+.chev{color:var(--muted);transition:transform .15s}
+.row.open .chev{transform:rotate(90deg)}
+.detail{border-top:1px solid var(--line);padding:12px 14px 14px;display:grid;gap:10px}
+.facts{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:14px;margin:0}
+.facts dt{color:var(--muted);font-size:12px}
+.facts dd{margin:0;font-weight:600}
+.facts div{display:grid}
+.note{font-size:14px;background:var(--bg);padding:8px 10px;border-radius:4px}
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+.tblwrap table{min-width:620px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px}
+td.num,th.num{font-family:var(--font-mono);text-align:right;white-space:nowrap}
+tr.dup td{color:var(--muted);text-decoration:line-through}
+.empty{padding:20px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:6px}
+
+/* monitor */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:2px}
+.kpi b{font-family:var(--font-mono);font-size:28px;line-height:1.1}
+.kpi span{font-weight:600;font-size:14px}
+.kpi small{color:var(--muted);font-size:12px}
+.kpi.alert b{color:var(--avoid)}
+.age{display:grid;gap:3px;min-width:150px}
+.age .n{font-family:var(--font-mono);font-weight:600}
+.agebar{position:relative;height:8px;background:var(--line);border-radius:4px}
+.agebar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--c)}
+.agebar .mk{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.55}
+.unknown{color:var(--muted);font-size:12px}
+td .pill{font-size:12px;padding:1px 8px}
+.secrow td{background:var(--bg);font-weight:700;font-size:13px}
+.ref{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}
+.ref i{display:inline-block;width:2px;height:12px;background:var(--ink);opacity:.55;vertical-align:middle;margin-right:4px}
+
+.secs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.sec{border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:8px;align-content:start}
+.sec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.machines{display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:6px}
+.mc{border:1px solid var(--line);border-radius:4px;padding:5px 6px;display:grid;gap:4px}
+.mc.off{opacity:.55}
+.mc-h{font-family:var(--font-mono);font-size:12px;font-weight:600;display:flex;justify-content:space-between;gap:4px;color:var(--muted)}
+.mc-x{font-size:11px;color:var(--avoid);font-weight:600}
+.slots{display:grid;gap:3px}
+.slot{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:5px;font-size:12px;padding:2px 5px;border-radius:3px;border:1px dashed var(--line);color:var(--muted);min-width:0}
+.slot b{font-family:var(--font-mono);width:12px;flex:none}
+.slot span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.slot.has{border:1px solid var(--c);background:var(--cb);color:var(--c);cursor:pointer;font-weight:600}
+.slot.has span{font-family:var(--font-mono)}
+.slot.has:focus-visible{outline:2px solid var(--accent)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px}
+.legend span{display:flex;align-items:center;gap:6px}
+.lg{width:14px;height:10px;border-radius:2px;display:inline-block}
+.lg.has{background:var(--ok-bg);border:1px solid var(--ok)}
+.lg.none{border:1px dashed var(--muted)}
+
+/* supplier */
+.vgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.vcard{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:grid;gap:10px;align-content:start}
+.vcard .vh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.vcard .code{font-family:var(--font-mono);font-size:22px;font-weight:600}
+.vcard .name{font-size:12px;color:var(--muted)}
+.vstats{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin:0}
+.vstats div{display:grid}
+.vstats dt{font-size:12px;color:var(--muted)}
+.vstats dd{margin:0;font-family:var(--font-mono);font-weight:600;font-size:16px}
+.verdict{font-size:13px;font-weight:600;padding:6px 10px;border-radius:4px;background:var(--cb);color:var(--c)}
+.vnote{font-size:12px;color:var(--muted)}
+.outcome{font-weight:600}
+.outcome.fail{color:var(--avoid)} .outcome.run{color:var(--ok)}
+.foot{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px;display:grid;gap:4px}
+.foot b{color:var(--ink)}
+
+.AVOID{--c:var(--avoid);--cb:var(--avoid-bg)}
+.WATCH{--c:var(--watch);--cb:var(--watch-bg)}
+.OK{--c:var(--ok);--cb:var(--ok-bg)}
+.NA{--c:var(--muted);--cb:var(--bg)}
+@media (max-width:760px){
+  .row>button{grid-template-columns:1fr auto 18px;grid-template-areas:"sn pill chev" "count count count" "where where where";gap:6px 10px}
+  .row .sn{grid-area:sn}.row .pill{grid-area:pill}.row .count{grid-area:count}.row .where{grid-area:where}.row .chev{grid-area:chev}
+  .secs{grid-template-columns:1fr}
+  .pick{grid-template-columns:42px minmax(0,1fr)}.pick .rank{font-size:22px}.pick .snbig{font-size:20px}
+}
+@media (prefers-reduced-motion:reduce){.chev{transition:none}}
+</style>
+<style>
+  .topnav{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;margin-bottom:8px}
+  .topnav a{color:inherit;opacity:.8;text-decoration:none}
+  .npill{border-radius:999px;padding:2px 10px;font-weight:700;background:#e1f3e8;color:#1f7a45}
+  .npill.off{background:#fde8e6;color:#b42318}
+  .newdata{border:0;border-radius:999px;padding:3px 10px;font:inherit;font-weight:700;background:#fdf0d5;color:#7a4a00;cursor:pointer}
+  .pinwrap{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:80;padding:16px}
+  .pinbox{background:#fff;color:#111;border-radius:14px;padding:18px;max-width:360px;width:100%}
+  .pinbox h2{margin:0 0 6px;font-size:18px}.pinbox p{margin:0 0 12px;font-size:13px;color:#555}
+  .pinbox input{width:100%;font:inherit;font-size:22px;letter-spacing:6px;text-align:center;border:1px solid #ccc;border-radius:10px;padding:10px}
+  .pinbox button{width:100%;margin-top:10px;min-height:46px;border:0;border-radius:10px;background:#0f2f2a;color:#fff;font:inherit;font-weight:700}
+  .pinerr{color:#b42318;font-size:13px;min-height:18px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topnav"><a href="./">&#8592; เมนูหลัก</a><span id="npill" class="npill">…</span><button id="newdata" class="newdata" type="button" hidden>มีข้อมูลใหม่ — แตะเพื่ออัปเดต</button></div>
+  <header>
+    <div>
+      <h1>Vacuum Pump S/N Board</h1>
+      <div class="sub">ORION KRF15A-V-01A · เครื่อง Spin coat (SPCO) Sensity1–3</div>
+    </div>
+    <div class="sub">ข้อมูลจาก Pump S/N Database · ข้อมูล ณ <span class="mono" id="loadedAt">—</span> · <button class="linkbtn" id="reload" type="button">โหลดใหม่</button></div>
+  </header>
+
+  <div id="loading" class="empty">กำลังโหลดข้อมูลจาก Google Sheet…</div>
+  <div class="tabs" hidden id="tabbar" role="tablist" aria-label="มุมมอง">
+    <button class="tab" role="tab" id="t-use" data-v="use" aria-controls="v-use">ใช้ตัวไหน <b id="n-use"></b></button>
+    <button class="tab" role="tab" id="t-monitor" data-v="monitor" aria-controls="v-monitor">Monitor บนเครื่อง <b id="n-mon"></b></button>
+    <button class="tab" role="tab" id="t-supplier" data-v="supplier" aria-controls="v-supplier">ผลงานร้านซ่อม <b id="n-sup"></b></button>
+  </div>
+
+  <!-- TAB 1 -->
+  <section class="view" id="v-use" role="tabpanel" aria-labelledby="t-use" hidden>
+    <div class="tools">
+      <label for="q" class="sub" style="flex-basis:100%">เช็ค S/N ก่อนหยิบไปติดตั้ง (พิมพ์บางส่วนก็ได้)</label>
+      <input id="q" type="search" placeholder="เช่น 760070 หรือ K195" autocomplete="off">
+      <button class="btn" id="reset" type="button">ล้าง</button>
+    </div>
+    <div id="hit" hidden></div>
+
+    <div class="panel">
+      <div class="phead"><h2>On hand — หยิบตามลำดับนี้</h2><span class="sub">เรียงจากตัวที่ควรใช้ก่อน: คำแนะนำ → blank-off ผ่านแล้ว → ซ่อมน้อยครั้ง</span></div>
+      <div class="picks" id="picks"></div>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><h2>ยังหยิบไม่ได้</h2><span class="sub">ตัวที่จะกลับมาเป็น On hand หรือยังต้องตามหา</span></div>
+      <div class="pipe" id="pipe"></div>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><h2>Pump ทั้งหมด</h2><span class="sub">เรียงจากตัวที่เสียบ่อยที่สุด · กดแถวเพื่อดูประวัติ</span></div>
+      <div class="chips" id="gchips" role="group" aria-label="กรองตามสถานะ"></div>
+      <div class="sub" id="result"></div>
+      <div class="list" id="list"></div>
+    </div>
+  </section>
+
+  <!-- TAB 2 -->
+  <section class="view" id="v-monitor" role="tabpanel" aria-labelledby="t-monitor" hidden>
+    <div class="kpis" id="kpis"></div>
+    <div class="panel">
+      <div class="phead"><h2>อายุใช้งานหลัง setup</h2><span class="sub">นับจากวันติดตั้งถึงวันนี้ · เรียงตัวเสี่ยงก่อน</span></div>
+      <div class="ref" id="ref"></div>
+      <div class="tblwrap"><table id="montbl"></table></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><h2>ตำแหน่ง pump แต่ละ section</h2><span class="sub">P = Primer, T = Top, R = Protect · กดช่องที่มี S/N เพื่อดูประวัติ</span></div>
+      <div class="secs" id="secs"></div>
+      <div class="legend sub"><span><i class="lg has"></i>ลง S/N แล้ว (สีตามคำแนะนำ)</span><span><i class="lg none"></i>ยังไม่ลง S/N</span></div>
+    </div>
+  </section>
+
+  <!-- TAB 3 -->
+  <section class="view" id="v-supplier" role="tabpanel" aria-labelledby="t-supplier" hidden>
+    <div class="vgrid" id="vgrid"></div>
+    <div class="panel">
+      <div class="phead"><h2>ผลหลังซ่อม — ติดตั้งแล้วอยู่ได้กี่วัน</h2><span class="sub">จากบันทึกการติดตั้งที่รู้ว่าซ่อมโดยใครก่อนติดตั้ง</span></div>
+      <div class="tblwrap"><table id="afttbl"></table></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><h2>ผลทดสอบ vacuum ตอนรับคืน</h2><span class="sub">เกณฑ์ blank-off ผ่าน ≥ 75 kPa</span></div>
+      <div class="tblwrap"><table id="testtbl"></table></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><h2>งานซ่อมทั้งหมดตามร้าน</h2></div>
+      <div class="chips" id="vchips" role="group" aria-label="เลือกร้าน"></div>
+      <div class="tblwrap"><table id="jobtbl"></table></div>
+    </div>
+  </section>
+
+  <div class="foot">
+    <div><b>blank-off test</b> ขัน gauge เข้า inlet + ปิด VC63 · เกณฑ์ผ่าน ≥ 75 kPa · เป้า ≥ 80 · สเปค 84 · pump ทุกตัวที่กลับจากซ่อมต้อง test ก่อนติดตั้ง</div>
+    <div><b>คำแนะนำ</b> ไม่แนะนำ = ซ่อม ≥ 4 ครั้ง หรือเสียภายใน 30 วันหลังติดตั้ง ≥ 2 ครั้ง · เฝ้าระวัง = ซ่อม ≥ 2 ครั้ง หรือเคยเสียเร็ว หรือ blank-off &lt; 75 kPa · ใช้ได้ = ประวัติน้อยหรือตัวใหม่</div>
+    <div>รายการขีดฆ่า = งานซ่อมที่สงสัยว่าซ้ำ ไม่นับในจำนวนครั้ง · ข้อมูลจัดซื้อ (PO / ราคา) ไม่แสดงในแอปนี้ · แก้ข้อมูลที่ Google Sheet "Pump S/N Database – ORION KRF15A" ตามกฎ pump-sn-database-update-rules.md</div>
+  </div>
+</div>
+
+
+<script>
+let RAW, MSTAT;
+function boot(res){
+RAW=res.raw; MSTAT=res.mstat||{};
+document.getElementById("loadedAt").textContent=res.loadedAt;
+document.getElementById("loading").hidden=true;
+document.getElementById("tabbar").hidden=false;
+/* ===== helpers ===== */
+const tbl=rows=>{const [h,...r]=rows;return r.map(x=>Object.fromEntries(h.map((k,i)=>[k,String(x[i]??"").trim()])))};
+const num=s=>{const n=parseFloat(String(s).replace(/,/g,""));return isNaN(n)?0:n};
+const MON={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+const pd=s=>{if(!s)return null;const m=/^(\d{1,2})-(\w{3})-(\d{4})$/.exec(s);if(m)return new Date(+m[3],MON[m[2]],+m[1]);const t=Date.parse(s);if(isNaN(t))return null;const d=new Date(t);d.setHours(0,0,0,0);return d};
+const TODAY=(()=>{const d=new Date();d.setHours(0,0,0,0);return d})();
+const SNAP=new Date(2026,9,30);
+const dd=(a,b)=>Math.round((b-a)/864e5);
+const fmt=n=>n==null||n===""?"—":Number(n).toLocaleString("en-US");
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const norm=s=>s.toUpperCase().replace(/[\s\-]/g,"").replace(/^KI/,"K1");
+const short=m=>m.replace(/^MASS\d-SPCO-/,"");
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+
+const P=tbl(RAW.pumps).filter(p=>p.sn!=="UNKNOWN").map(p=>({...p,rec:p.recommendation,rc:num(p.repair_count),cost:num(p.repair_cost_thb),fails:num(p.total_failures),early:num(p.early_fail_le30d)}));
+const R=tbl(RAW.repairs).map(r=>({...r,costN:num(r.cost_thb),d:pd(r.date),dup:r.dup_suspect==="Y",vac:r.vacuum_kpa?num(r.vacuum_kpa):null,wu:pd(r.warranty_until)}));
+const S=tbl(RAW.periods).map(s=>({...s,ins:pd(s.install_date),rem:pd(s.remove_date)}));
+const POS=tbl(RAW.positions).map(p=>({...p,f26:num(p.failures_2026),u:p.unit[0]}));
+const V=tbl(RAW.vendors);
+const bySn=Object.fromEntries(P.map(p=>[p.sn,p]));
+
+const LABEL={AVOID:"ไม่แนะนำให้ใช้",WATCH:"เฝ้าระวัง",OK:"ใช้ได้"};
+const ORDER={AVOID:0,WATCH:1,OK:2};
+const GROUPS=[
+ {k:"inst",cls:"s-inst",label:"ติดตั้งอยู่",test:p=>p.status==="In service"},
+ {k:"hand",cls:"s-hand",label:"On hand",test:p=>p.status.startsWith("Spare")},
+ {k:"vend",cls:"s-vend",label:"ระหว่างส่งซ่อม",test:p=>p.status==="At vendor"},
+ {k:"wait",cls:"s-wait",label:"รอซ่อม",test:p=>p.status==="Damaged"},
+ {k:"mia",cls:"s-mia",label:"หาไม่เจอ (MIA)",test:p=>p.status==="MIA"},
+ {k:"unk",cls:"s-unk",label:"ไม่ทราบสถานะ",test:()=>true}
+];
+const grpOf=p=>GROUPS.find(g=>g.test(p)).k;
+const STATUS={"In service":"ติดตั้งใช้งานอยู่","Spare – รอ test":"On hand · รอ blank-off test","Spare – พร้อมใช้":"On hand · พร้อมใช้","Damaged":"รอซ่อม","At vendor":"ระหว่างส่งซ่อม","MIA":"หาไม่เจอ (MIA)","Unknown":"ไม่ทราบสถานะ"};
+const keys=p=>[p.sn,...p.sn_aliases.split(",").map(s=>s.trim()).filter(Boolean)].map(norm);
+const repsOf=sn=>R.filter(r=>r.sn===sn).sort((a,b)=>(b.d||0)-(a.d||0));
+const lastWarranty=sn=>{const w=repsOf(sn).find(r=>r.wu);return w&&w.wu>=TODAY?w:null};
+const dots=(n,cap=6)=>`<span class="dots" aria-hidden="true">${Array.from({length:Math.max(n,cap)},(_,i)=>`<i class="${i<n?"":"e"}"></i>`).join("")}</span>`;
+
+/* ===== detail (shared) ===== */
+function detail(p){
+  const reps=repsOf(p.sn), per=S.filter(s=>s.sn===p.sn);
+  let h=`<div class="detail"><dl class="facts">
+    <div><dt>สิ่งที่ต้องทำ</dt><dd>${esc(p.action)}</dd></div>
+    <div><dt>ซ่อมล่าสุด</dt><dd class="mono">${p.last_repair_date||"—"}${p.last_vendor?" · "+p.last_vendor:""}</dd></div>
+    <div><dt>เสียหน้างาน</dt><dd>${p.fails} ครั้ง${p.early?` · ภายใน 30 วัน ${p.early} ครั้ง`:""}</dd></div>
+    <div><dt>blank-off ล่าสุด</dt><dd class="mono">${p.last_blankoff_kpa?p.last_blankoff_kpa+" kPa":"ยังไม่มีผล"}</dd></div>
+  </dl>`;
+  if(p.note)h+=`<div class="note">${esc(p.note)}</div>`;
+  if(per.length)h+=`<div class="tblwrap"><table><thead><tr><th>ติดตั้งที่</th><th>วันติดตั้ง</th><th>วันถอด</th><th class="num">ใช้งาน (วัน)</th><th>ซ่อมโดย</th><th>หมายเหตุ</th></tr></thead><tbody>`+
+    per.map(s=>{const run=s.ins?dd(s.ins,s.rem||TODAY):null;return `<tr><td>${esc(short(s.machine_no))} ${esc(s.unit)}</td><td class="mono">${s.install_date||"—"}</td><td class="mono">${s.remove_date||(s.ins?"ใช้งานอยู่":"—")}</td><td class="num">${run??"—"}</td><td>${esc(s.repaired_by_before_install||"—")}</td><td>${esc(s.note)}</td></tr>`}).join("")+`</tbody></table></div>`;
+  h+=reps.length?`<div class="tblwrap"><table><thead><tr><th>วันที่</th><th>ร้าน</th><th>งาน</th><th class="num">vacuum kPa</th><th>ประกันถึง</th></tr></thead><tbody>`+
+    reps.map(r=>`<tr class="${r.dup?"dup":""}"><td class="mono">${r.date}</td><td>${r.vendor}</td><td>${esc(r.work_parts)}${r.note?`<div class="sub">${esc(r.note)}</div>`:""}</td><td class="num">${r.vac??"—"}</td><td class="mono">${r.warranty_until||"—"}</td></tr>`).join("")+`</tbody></table></div>`
+    :`<div class="sub">ยังไม่มีประวัติส่งซ่อม</div>`;
+  return h+"</div>";
+}
+
+/* ===== TAB 1: which pump to use ===== */
+let grp=null, openSn=null;
+const q=document.getElementById("q");
+const READY=p=>p.status==="Spare – พร้อมใช้";
+const onHand=P.filter(p=>grpOf(p)==="hand").sort((a,b)=>ORDER[b.rec]-ORDER[a.rec]||READY(b)-READY(a)||a.rc-b.rc||a.fails-b.fails);
+
+function buildPicks(){
+  const el=document.getElementById("picks");
+  if(!onHand.length){el.innerHTML=`<div class="empty">ไม่มี pump On hand — ดูตัวที่กำลังกลับจากร้านซ่อมด้านล่าง</div>`;return}
+  el.innerHTML=onHand.map((p,i)=>{
+    const w=lastWarranty(p.sn);
+    const doTxt=p.rec==="AVOID"?"ใช้เป็นตัวสุดท้ายเท่านั้น แจ้งหัวหน้าก่อนติดตั้ง":READY(p)?"หยิบใช้ได้ (blank-off ผ่านแล้ว)":"ทำ blank-off test ให้ผ่าน ≥ 75 kPa ก่อนติดตั้ง";
+    return `<div class="pick ${p.rec}"><div class="rank" aria-label="ลำดับ ${i+1}">${i+1}</div><div class="body">
+      <div class="top"><span class="snbig">${esc(p.sn)}</span><span class="pill">${LABEL[p.rec]}</span><span class="ready ${READY(p)?"y":"n"}">${READY(p)?"blank-off ผ่าน":"รอ blank-off"}</span>${w?`<span class="warranty">ประกัน ${w.vendor} ถึง ${w.warranty_until}</span>`:""}</div>
+      <div class="do">${doTxt}</div>
+      <div class="meta"><span>ซ่อม <b>${p.rc}</b> ครั้ง ${dots(p.rc)}</span><span>เสียหน้างาน <b>${p.fails}</b>${p.early?` (เร็ว ${p.early})`:""}</span><span>ซ่อมล่าสุด <b>${p.last_repair_date||"—"}</b>${p.last_vendor?" · "+p.last_vendor:""}</span></div>
+      <div><button class="linkbtn" data-open="${esc(p.sn)}" type="button">ดูประวัติ</button></div>
+    </div></div>`}).join("");
+}
+
+function buildPipe(){
+  const col=(k,title,hint,items)=>`<div class="pipe-col ${GROUPS.find(g=>g.k===k).cls}"><div class="h"><span><b style="font-size:15px;color:var(--ink);font-family:var(--font-body)">${title}</b></span><b>${items.length}</b></div><div class="sub" style="font-size:12px">${hint}</div>${items.join("")||`<div class="sub">—</div>`}</div>`;
+  const vend=P.filter(p=>grpOf(p)==="vend").map(p=>{const r=repsOf(p.sn).find(r=>r.vendor===p.current_location);const d=r&&r.d?dd(r.d,TODAY):null;
+    return `<div class="pipe-item"><code>${esc(p.sn)}</code><span>${esc(p.current_location)}${d!=null?` · ส่งมา ${d} วัน`:""}</span></div>`});
+  const wait=P.filter(p=>grpOf(p)==="wait").map(p=>`<div class="pipe-item"><code>${esc(p.sn)}</code><span>รอส่งซ่อม</span></div>`);
+  const mia=P.filter(p=>grpOf(p)==="mia").map(p=>`<div class="pipe-item"><code>${esc(p.sn)}</code><span>${esc(p.current_location)}</span></div>`);
+  const unk=P.filter(p=>grpOf(p)==="unk").map(p=>`<div class="pipe-item"><code>${esc(p.sn)}</code><span>${esc(p.note||"ยังไม่ตรวจนับ")}</span></div>`);
+  document.getElementById("pipe").innerHTML=
+    col("vend","ระหว่างส่งซ่อม","จะกลับมาเป็น On hand · ต้อง blank-off ตอนรับคืน",vend)+
+    col("wait","รอซ่อม","ถอดออกมาแล้ว ยังไม่ได้ส่ง",wait)+
+    col("mia","หาไม่เจอ (MIA)","ไม่พบตอนตรวจนับ ให้หน้างานช่วยหา",mia)+
+    col("unk","ไม่ทราบสถานะ","มีประวัติซ่อม แต่ไม่พบตอนตรวจ S/N",unk);
+}
+
+function row(p){
+  const open=openSn===p.sn;
+  return `<div class="row ${p.rec}${open?" open":""}"><button type="button" data-sn="${esc(p.sn)}" aria-expanded="${open}">
+    <span class="sn">${esc(p.sn)}${p.sn_aliases?`<span class="alias">${esc(p.sn_aliases)}</span>`:""}</span>
+    <span class="pill">${LABEL[p.rec]}</span>
+    <span class="count">${dots(p.rc)}<span>ซ่อม ${p.rc} · เสีย ${p.fails}</span></span>
+    <span class="where"><span class="st">${STATUS[p.status]||esc(p.status)}</span>${p.current_location&&p.current_location!=="Store"?`<span class="loc">${esc(p.current_location)}</span>`:""}</span>
+    <span class="chev" aria-hidden="true">›</span></button>${open?detail(p):""}</div>`;
+}
+const ALL=[...P].sort((a,b)=>ORDER[a.rec]-ORDER[b.rec]||b.rc-a.rc||b.fails-a.fails||b.cost-a.cost);
+
+function buildChips(){
+  document.getElementById("gchips").innerHTML=`<button class="chip" data-g="" type="button">ทั้งหมด ${P.length}</button>`+
+    GROUPS.map(g=>{const n=P.filter(p=>grpOf(p)===g.k).length;return n?`<button class="chip" data-g="${g.k}" type="button">${g.label} ${n}</button>`:""}).join("");
+}
+function renderUse(){
+  const term=norm(q.value.trim());
+  let list=ALL.filter(p=>!grp||grpOf(p)===grp);
+  if(term)list=list.filter(p=>keys(p).some(k=>k.includes(term)));
+  document.querySelectorAll("#gchips .chip").forEach(b=>b.setAttribute("aria-pressed",(b.dataset.g||null)===grp));
+  const hit=document.getElementById("hit");
+  const exact=term?P.find(p=>keys(p).includes(term)):null;
+  if(exact){
+    const msg={AVOID:"ไม่แนะนำให้ใช้ — ใช้เป็นตัวสำรองสุดท้ายเท่านั้น แจ้งหัวหน้าก่อนติดตั้ง",WATCH:"ใช้ได้แต่ต้องเฝ้าระวัง — ทำ blank-off test ให้ผ่าน ≥ 75 kPa ก่อนติดตั้ง",OK:"ใช้ได้ — ถ้าเพิ่งกลับจากซ่อมหรือเป็นตัวใหม่ ให้ทำ blank-off test ก่อน"}[exact.rec];
+    hit.hidden=false;hit.className="hit "+exact.rec;
+    hit.innerHTML=`<div class="sub">S/N <span class="mono">${esc(exact.sn)}</span> · ${STATUS[exact.status]||esc(exact.status)}${exact.current_location&&exact.current_location!=="Store"?" · "+esc(exact.current_location):""}</div><div class="big">${LABEL[exact.rec]}</div><div>${msg}</div>`;
+    openSn=exact.sn;
+  } else hit.hidden=true;
+  document.getElementById("result").textContent=`แสดง ${list.length} จาก ${P.length} ตัว`;
+  document.getElementById("list").innerHTML=list.length?list.map(row).join(""):`<div class="empty">ไม่พบ S/N "${esc(q.value)}" — ตรวจตัวอักษรบน nameplate อีกครั้ง หรือแจ้ง Maintenance ให้เพิ่มข้อมูล</div>`;
+}
+
+/* ===== TAB 2: monitor installed ===== */
+const failRuns=S.filter(s=>s.ins&&s.rem&&s.remove_reason==="Failure").map(s=>dd(s.ins,s.rem));
+const AVGF=avg(failRuns);
+function installOf(sn,machine,unit){return S.filter(s=>s.sn===sn&&s.machine_no===machine&&s.unit===unit&&!s.rem).sort((a,b)=>(b.ins||0)-(a.ins||0))[0]}
+const INST=POS.filter(p=>p.current_sn).map(p=>{
+  const pump=bySn[p.current_sn]||{sn:p.current_sn,rec:"NA",rc:0,fails:0};
+  const per=installOf(p.current_sn,p.machine_no,p.unit);
+  const days=per&&per.ins?dd(per.ins,TODAY):null;
+  const sinceFound=dd(SNAP,TODAY);
+  return {pos:p,pump,per,days,sinceFound,by:per&&per.repaired_by_before_install||pump.last_vendor||""};
+});
+const risk=x=>ORDER[x.pump.rec]??3;
+INST.sort((a,b)=>risk(a)-risk(b)||(b.days??-1)-(a.days??-1));
+
+function buildKpis(){
+  const known=INST.filter(x=>x.days!=null);
+  const over=known.filter(x=>AVGF&&x.days>=AVGF).length;
+  const avoidIn=INST.filter(x=>x.pump.rec==="AVOID");
+  document.getElementById("kpis").innerHTML=`
+    <div class="kpi"><b>${INST.length}<span class="sub" style="font-size:14px">/${POS.length}</span></b><span>ตำแหน่งที่ลง S/N แล้ว</span><small>Sensity2, Sensity3 ยังไม่ได้ตรวจ S/N</small></div>
+    <div class="kpi ${avoidIn.length?"alert":""}"><b>${avoidIn.length}</b><span>ตัวไม่แนะนำที่ติดตั้งอยู่</span><small>${avoidIn.map(x=>`${esc(x.pump.sn)} @ ${short(x.pos.machine_no)} ${x.pos.unit}`).join(" · ")||"—"} → เตรียม spare</small></div>
+    <div class="kpi"><b>${known.length}</b><span>ตัวที่รู้วันติดตั้ง</span><small>อีก ${INST.length-known.length} ตัวพบตอนตรวจ S/N 30 Oct 26 ยังไม่มีวันติดตั้ง</small></div>
+    <div class="kpi ${over?"alert":""}"><b>${over}</b><span>ใช้งานเกินอายุเฉลี่ยตอนเสีย</span><small>อายุเฉลี่ยก่อนเสีย ${AVGF?Math.round(AVGF):"—"} วัน (จาก ${failRuns.length} ครั้งที่รู้วัน)</small></div>`;
+  document.getElementById("ref").innerHTML=`<span><i></i>เส้นดำ = 30 วัน (เกณฑ์เสียเร็ว)</span><span>เคยเสียหลังติดตั้ง ${failRuns.sort((a,b)=>a-b).join(", ")} วัน</span><span>ข้อมูลยังน้อย ใช้เป็นแนวทางเท่านั้น</span>`;
+}
+function buildMonTable(){
+  const MAX=Math.max(180,...INST.map(x=>x.days||0));
+  const secs=[...new Set(POS.map(p=>p.section))];
+  let h=`<thead><tr><th>ตำแหน่ง</th><th>S/N</th><th>คำแนะนำ</th><th>ติดตั้งเมื่อ</th><th>อายุหลัง setup</th><th>ซ่อมก่อนติดตั้งโดย</th><th class="num">ซ่อมรวม</th></tr></thead><tbody>`;
+  secs.forEach(sec=>{
+    const rows=INST.filter(x=>x.pos.section===sec);
+    const empty=POS.filter(p=>p.section===sec&&!p.current_sn).length;
+    h+=`<tr class="secrow"><td colspan="7">${sec} · ลง S/N ${rows.length} ตำแหน่ง${empty?` · ยังไม่ลง ${empty}`:""}</td></tr>`;
+    rows.forEach(x=>{
+      const r=x.pump.rec;
+      const age=x.days!=null?`<div class="age ${r}"><span class="n">${x.days} วัน</span><div class="agebar"><i style="width:${Math.min(100,x.days/MAX*100)}%"></i><span class="mk" style="left:${30/MAX*100}%"></span></div></div>`
+        :`<span class="unknown">ไม่ทราบ · พบ ${x.sinceFound>0?x.sinceFound+" วันก่อน":"วันนี้"} (ตรวจ 30 Oct)</span>`;
+      h+=`<tr><td>${short(x.pos.machine_no)} ${x.pos.unit}<div class="sub" style="font-size:12px">${x.pos.model}</div></td>
+        <td><button class="linkbtn mono" data-goto="${esc(x.pump.sn)}" type="button">${esc(x.pump.sn)}</button></td>
+        <td><span class="pill ${r}">${LABEL[r]||"ไม่มีข้อมูล"}</span></td>
+        <td class="mono">${x.per&&x.per.install_date||"—"}</td><td>${age}</td>
+        <td>${esc(x.by||"—")}</td><td class="num">${x.pump.rc}</td></tr>`;
+    });
+  });
+  document.getElementById("montbl").innerHTML=h+"</tbody>";
+}
+function buildSecs(){
+  const secs=[...new Set(POS.map(p=>p.section))];
+  document.getElementById("secs").innerHTML=secs.map(sec=>{
+    const ps=POS.filter(p=>p.section===sec);const done=ps.filter(p=>p.current_sn).length;
+    const machines=[...new Set(ps.map(p=>p.machine_no))];
+    return `<div class="sec"><div class="sec-h"><b>${sec}</b><span class="mono sub">ลง S/N ${done}/${ps.length} · ${machines.length} เครื่อง</span></div>
+    <div class="bar" aria-hidden="true"><i style="width:${done/ps.length*100}%"></i></div>
+    <div class="machines">${machines.map(m=>{const mp=ps.filter(p=>p.machine_no===m);const ms=MSTAT[m];
+      return `<div class="mc${ms?" off":""}"><div class="mc-h"><span>${short(m)}</span><span>${mp[0].model}</span></div>${ms?`<div class="mc-x">${ms}</div>`:""}<div class="slots">${mp.map(p=>{
+        const pump=bySn[p.current_sn];
+        return p.current_sn?`<button class="slot has ${pump?pump.rec:"NA"}" data-goto="${esc(p.current_sn)}" title="${p.unit} · ${esc(p.current_sn)}${pump?" · "+LABEL[pump.rec]:""}" type="button"><b>${p.u}</b><span>${esc(p.current_sn)}</span></button>`
+          :`<div class="slot" title="${p.unit} · ยังไม่ลง S/N"><b>${p.u}</b><span>—</span></div>`}).join("")}</div></div>`}).join("")}</div></div>`;
+  }).join("");
+}
+
+/* ===== TAB 3: supplier performance ===== */
+const VEND=V.map(v=>{
+  const jobs=R.filter(r=>r.vendor===v.vendor_code&&!r.dup);
+  const paid=jobs.filter(r=>r.costN>0);
+  const after=S.filter(s=>s.repaired_by_before_install===v.vendor_code&&s.ins);
+  const failed=after.filter(s=>s.rem&&s.remove_reason==="Failure");
+  const running=after.filter(s=>!s.rem);
+  const failDays=failed.map(s=>dd(s.ins,s.rem));
+  const open=P.filter(p=>p.status==="At vendor"&&p.current_location===v.vendor_code);
+  const tests=jobs.filter(r=>r.vac!=null);
+  const last12=jobs.filter(r=>r.d&&dd(r.d,TODAY)<=365).length;
+  return {...v,jobs,paid,after,failed,running,failDays,open,tests,last12,
+    total:paid.reduce((a,r)=>a+r.costN,0),avgCost:paid.length?paid.reduce((a,r)=>a+r.costN,0)/paid.length:null};
+});
+function verdict(v){
+  if(v.failed.length)return {c:"AVOID",t:`เสียหลังซ่อม ${v.failed.length} จาก ${v.after.length} ครั้งที่ติดตาม · เฉลี่ย ${Math.round(avg(v.failDays))} วัน`};
+  if(v.running.length)return {c:"OK",t:`ติดตั้งหลังซ่อม ${v.after.length} ครั้ง ยังไม่เสีย (ใช้งานอยู่ ${v.running.map(s=>dd(s.ins,TODAY)).join(", ")} วัน)`};
+  return {c:"NA",t:"ยังไม่มีบันทึกการติดตั้งหลังซ่อมที่รู้วัน — ติดตามต่อ"};
+}
+function buildVendors(){
+  document.getElementById("vgrid").innerHTML=VEND.map(v=>{const vd=verdict(v);
+    return `<div class="vcard"><div class="vh"><span class="code">${v.vendor_code}</span><span class="name">${esc(v.vendor_name)}</span></div>
+      <div class="verdict ${vd.c}">${vd.t}</div>
+      <dl class="vstats">
+        <div><dt>งานซ่อม (รวม / 12 เดือน)</dt><dd>${v.jobs.length} / ${v.last12}</dd></div>
+        <div><dt>ประกัน</dt><dd>${v.warranty_months?v.warranty_months+" เดือน":"—"}</dd></div>
+        <div><dt>มีผลทดสอบ vacuum</dt><dd>${v.tests.length} งาน</dd></div>
+        <div><dt>งานค้างที่ร้านตอนนี้</dt><dd>${v.open.length?v.open.map(p=>esc(p.sn)).join(", "):"—"}</dd></div>
+      </dl>
+      <div class="vnote">${esc(v.note)}</div></div>`}).join("");
+  // after-repair outcomes
+  const rows=S.filter(s=>s.repaired_by_before_install&&s.ins).sort((a,b)=>a.repaired_by_before_install.localeCompare(b.repaired_by_before_install)||a.ins-b.ins);
+  document.getElementById("afttbl").innerHTML=`<thead><tr><th>ร้าน</th><th>S/N</th><th>ติดตั้งที่</th><th>วันติดตั้ง</th><th class="num">อยู่ได้ (วัน)</th><th>ผล</th></tr></thead><tbody>`+
+    rows.map(s=>{const fail=s.rem&&s.remove_reason==="Failure";const d=dd(s.ins,s.rem||TODAY);
+      return `<tr><td><b>${s.repaired_by_before_install}</b></td><td class="mono">${esc(s.sn)}</td><td>${short(s.machine_no)} ${s.unit}</td><td class="mono">${s.install_date}</td><td class="num">${d}</td><td class="outcome ${fail?"fail":"run"}">${fail?`เสีย ${s.remove_date}${d<=30?" (เสียเร็ว ≤ 30 วัน)":""}`:"ใช้งานอยู่"}</td></tr>`}).join("")+
+    `</tbody>`;
+  // test results
+  const t=R.filter(r=>r.vac!=null).sort((a,b)=>b.d-a.d);
+  document.getElementById("testtbl").innerHTML=`<thead><tr><th>วันที่</th><th>ร้าน</th><th>S/N</th><th class="num">vacuum kPa</th><th>วิธีทดสอบ</th><th>ผล</th></tr></thead><tbody>`+
+    t.map(r=>{const ok=r.vac>=75&&/blank/i.test(r.test_method);return `<tr><td class="mono">${r.date}</td><td><b>${r.vendor}</b></td><td class="mono">${esc(r.sn)}</td><td class="num">${r.vac}</td><td>${esc(r.test_method||"—")}</td><td class="outcome ${ok?"run":"fail"}">${ok?"ผ่านเกณฑ์":r.vac>=75?"ค่าผ่าน แต่ไม่ใช่วิธี blank-off":"ไม่ผ่าน / วิธีทดสอบใช้ไม่ได้"}</td></tr>`}).join("")+`</tbody>`;
+}
+let vsel="WN";
+function buildJobs(){
+  document.getElementById("vchips").innerHTML=VEND.map(v=>`<button class="chip" data-vc="${v.vendor_code}" aria-pressed="${v.vendor_code===vsel}" type="button">${v.vendor_code} ${v.jobs.length}</button>`).join("");
+  const jobs=R.filter(r=>r.vendor===vsel).sort((a,b)=>b.d-a.d);
+  document.getElementById("jobtbl").innerHTML=`<thead><tr><th>วันที่</th><th>S/N</th><th>งาน</th><th>ประกันถึง</th></tr></thead><tbody>`+
+    jobs.map(r=>`<tr class="${r.dup?"dup":""}"><td class="mono">${r.date}</td><td class="mono">${esc(r.sn==="UNKNOWN"?"ไม่ระบุ S/N":r.sn)}</td><td>${esc(r.work_parts)}${r.note?`<div class="sub">${esc(r.note)}</div>`:""}</td><td class="mono">${r.warranty_until||"—"}</td></tr>`).join("")+`</tbody>`;
+}
+
+/* ===== tabs ===== */
+const VIEWS=["use","monitor","supplier"];
+function show(v){
+  if(!VIEWS.includes(v))v="use";
+  VIEWS.forEach(k=>{document.getElementById("v-"+k).hidden=k!==v;document.getElementById("t-"+k).setAttribute("aria-selected",k===v);document.getElementById("t-"+k).tabIndex=k===v?0:-1});
+}
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return;show(b.dataset.v);try{history.replaceState(null,"","#"+b.dataset.v)}catch(_){location.hash=b.dataset.v}});
+document.querySelector(".tabs").addEventListener("keydown",e=>{
+  if(!["ArrowLeft","ArrowRight"].includes(e.key))return;
+  const cur=VIEWS.findIndex(k=>document.getElementById("t-"+k).getAttribute("aria-selected")==="true");
+  const n=VIEWS[(cur+(e.key==="ArrowRight"?1:VIEWS.length-1))%VIEWS.length];show(n);document.getElementById("t-"+n).focus();
+});
+window.addEventListener("hashchange",()=>show(location.hash.slice(1)));
+
+/* ===== events ===== */
+function gotoSn(sn){show("use");try{history.replaceState(null,"","#use")}catch(_){}q.value=sn;grp=null;renderUse();
+  document.getElementById("hit").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})}
+document.body.addEventListener("click",e=>{
+  const g=e.target.closest("[data-goto]");if(g){gotoSn(g.dataset.goto);return}
+  const o=e.target.closest("[data-open]");if(o){gotoSn(o.dataset.open);return}
+  const r=e.target.closest("#list button[data-sn]");if(r){openSn=openSn===r.dataset.sn?null:r.dataset.sn;renderUse();return}
+  const c=e.target.closest("#gchips .chip");if(c){grp=c.dataset.g||null;try{grp?localStorage.setItem("pumpGroup",grp):localStorage.removeItem("pumpGroup")}catch(_){}renderUse();return}
+  const vc=e.target.closest("#vchips .chip");if(vc){vsel=vc.dataset.vc;buildJobs();return}
+});
+q.addEventListener("input",()=>{if(!q.value)openSn=null;renderUse()});
+document.getElementById("reset").addEventListener("click",()=>{q.value="";grp=null;openSn=null;try{localStorage.removeItem("pumpGroup")}catch(_){}renderUse();q.focus()});
+try{const g=localStorage.getItem("pumpGroup");if(g&&GROUPS.some(x=>x.k===g))grp=g}catch(_){}
+
+/* ===== init ===== */
+document.getElementById("n-use").textContent=onHand.length;
+document.getElementById("n-mon").textContent=INST.length;
+document.getElementById("n-sup").textContent=VEND.length;
+buildPicks();buildPipe();buildChips();renderUse();
+buildKpis();buildMonTable();buildSecs();
+buildVendors();buildJobs();
+show(location.hash.slice(1));
+
+}
+function fail(err){
+  const el=document.getElementById("loading");
+  el.hidden=false;
+  el.textContent="โหลดข้อมูลไม่สำเร็จ: "+(err&&err.message||err)+" — ตรวจว่าบัญชีที่ deploy ยังเปิด Sheet \"Pump S/N Database – ORION KRF15A\" ได้ และชื่อแท็บไม่ถูกเปลี่ยน";
+}
+</script>
+<div class="pinwrap" id="pinWrap" hidden><form class="pinbox" id="pinForm"><h2>ใส่ PIN ของเครื่อง</h2><p>ใส่ครั้งเดียว เครื่องจะจำไว้</p>
+<input id="pinIn" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN"><div class="pinerr" id="pinErr" role="alert"></div><button type="submit">ตกลง</button></form></div>
+<script src="config.js"></script>
+<script src="store.js"></script>
+<script src="api.js"></script>
+<script>
+/* v1: ข้อมูล pump เก็บในเครื่อง (Store 'pump.data') เปิดตอนไม่มีเน็ตได้ — มีเน็ตจะดึงใหม่เบื้องหลัง แล้วขึ้นปุ่มให้แตะอัปเดต */
+(function(){
+  const $=id=>document.getElementById(id);
+  const net=()=>{$("npill").textContent=navigator.onLine?"ออนไลน์":"ออฟไลน์";$("npill").className="npill"+(navigator.onLine?"":" off")};
+  addEventListener("online",()=>{net();fetchFresh()});addEventListener("offline",net);net();
+  let shown=null;
+  function askPin(msg){return new Promise(res=>{$("pinWrap").hidden=false;$("pinErr").textContent=msg||"";$("pinIn").value="";$("pinIn").focus();
+    $("pinForm").onsubmit=e=>{e.preventDefault();const p=$("pinIn").value.trim();if(!p)return;Api.setPin(p);
+      Api.call("ping").then(()=>{$("pinWrap").hidden=true;res()},er=>{if(er.code==="PIN"){Api.clearPin();$("pinErr").textContent=er.message}else{$("pinWrap").hidden=true;res()}})}})}
+  function call(a){return Api.call(a,{},60000).catch(er=>{if(er.code==="PIN"){Api.clearPin();return askPin(er.message).then(()=>Api.call(a,{},60000))}throw er})}
+  function fetchFresh(){
+    if(!navigator.onLine||!Api.ready())return;
+    const go=()=>call("pump.data").then(d=>Store.set("pump.data",d).then(()=>{
+      if(!shown){shown=d;boot(d)}else if(d.loadedAt!==shown.loadedAt)$("newdata").hidden=false;
+    }),er=>{if(!shown)fail(er)});
+    if(!Api.pin())askPin().then(go);else go();
+  }
+  $("newdata").onclick=()=>location.reload();
+  $("reload").addEventListener("click",()=>{if(!navigator.onLine){alert("ไม่มีเน็ต — แสดงข้อมูลที่เก็บไว้ในเครื่อง");return}$("reload").textContent="กำลังโหลด…";
+    call("pump.data").then(d=>Store.set("pump.data",d)).then(()=>location.reload(),er=>{$("reload").textContent="โหลดใหม่";alert("โหลดไม่ได้: "+er.message)})});
+  Store.get("pump.data").then(d=>{
+    if(d){shown=d;boot(d)}
+    else if(!navigator.onLine){fail(new Error("ยังไม่มีข้อมูลในเครื่อง — เปิดหน้านี้ตอนมีเน็ตอย่างน้อย 1 ครั้ง"))}
+    fetchFresh();
+  });
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js");
+})();
+</script>
+</body>
+</html>

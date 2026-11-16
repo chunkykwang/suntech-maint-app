@@ -3,7 +3,7 @@
  * เปลี่ยน VERSION ทุกครั้งที่แก้ไฟล์ในรายการ SHELL เพื่อให้เครื่องผู้ใช้ได้เวอร์ชันใหม่
  * (ข้อมูลจาก Google Sheets จะไม่ถูก cache ที่นี่ — จะเก็บใน IndexedDB ของแอปแทน)
  */
-const VERSION = 'v1.0.0-repair.1';
+const VERSION = 'v1.0.0-pump.1';
 const CACHE = 'suntech-maint-' + VERSION;
 const SHELL = [
   './',
@@ -12,6 +12,7 @@ const SHELL = [
   './app.js',
   './manifest.webmanifest',
   './photo-test.html',
+  './pump.html',
   './repair.html',
   './repair.css',
   './repair.js',
