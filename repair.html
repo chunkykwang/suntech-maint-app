@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>แจ้งซ่อม</title>
+<meta name="theme-color" content="#0f2f2a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="repair.css">
+</head>
+<body>
+<header>
+  <a class="back" href="./">&#8592; เมนูหลัก</a>
+  <h1>ทำรายงานแจ้งซ่อม</h1>
+  <div class="sync">
+    <span id="net" class="pill" role="status" aria-live="polite">…</span>
+    <span id="pending" class="pill wait" hidden></span>
+    <button id="bSync" type="button" hidden>ส่งตอนนี้</button>
+  </div>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="t-form" aria-selected="true" type="button">ใบใหม่</button>
+    <button role="tab" id="t-list" aria-selected="false" type="button">ใบที่ส่งแล้ว</button>
+  </div>
+</header>
+
+<main>
+  <div id="loading" class="empty">กำลังโหลด…</div>
+  <div id="error" class="errbox" hidden></div>
+
+  <form id="frm" novalidate hidden>
+    <section class="card">
+      <h2><span class="n">1</span>ข้อมูลงาน</h2>
+      <div class="row">
+        <div class="f"><label for="tech">ชื่อช่าง <span class="req">*</span></label><select id="tech" required><option value="">— เลือกช่าง —</option></select><span class="err"></span></div>
+        <div class="f"><label for="date">วันที่ <span class="req">*</span></label><input id="date" type="date" required><span class="err"></span></div>
+      </div>
+      <div class="row">
+        <div class="f"><label for="t1">เวลาเริ่ม <span class="req">*</span></label><input id="t1" type="time" required><span class="err"></span></div>
+        <div class="f"><label for="t2">เวลาเสร็จงาน <span class="req">*</span></label><input id="t2" type="time" required><span class="err"></span></div>
+      </div>
+      <div class="down" id="down" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="n">2</span>เครื่องจักร</h2>
+      <div class="row">
+        <div class="f"><label for="mtype">Machine type <span class="req">*</span></label><select id="mtype" required><option value="">— เลือกประเภท —</option></select><span class="err"></span></div>
+        <div class="f"><label for="eq">หมายเลขเครื่อง <span class="req">*</span></label><select id="eq" required disabled><option value="">— เลือกประเภทก่อน —</option></select><span class="err"></span></div>
+      </div>
+      <div class="info" id="info" hidden></div>
+      <div class="f"><label for="pb">ปัญหาที่ได้รับแจ้ง <span class="req">*</span></label><textarea id="pb" required placeholder="อาการที่ผู้แจ้งบอก เช่น Vacuum pump Thermal relay trip"></textarea><span class="err"></span></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="n">3</span>ผลการตรวจและแก้ไข</h2>
+      <div class="f"><label for="sec">Sector (ส่วนของเครื่อง) <span class="req">*</span></label><select id="sec" required disabled><option value="">— เลือกเครื่องก่อน —</option></select><span class="err"></span></div>
+      <div class="f" id="secOtherF" hidden><label for="secOther">ระบุ Sector <span class="req">*</span></label><input id="secOther" type="text"><span class="err"></span></div>
+      <div class="f"><label for="cause">Cause of problem <span class="req">*</span></label><textarea id="cause" required placeholder="สิ่งที่ตรวจพบ / จุดที่เสีย"></textarea><span class="err"></span></div>
+      <div class="f"><label>Picture of problem <span class="opt">(ไม่บังคับ)</span></label>
+        <div class="pic"><div class="ph" id="pv1">ยังไม่มีรูป</div>
+          <div class="picbtns"><label class="btn ghost" for="p1c">ถ่ายรูป</label><label class="btn ghost" for="p1g">เลือกจากคลัง</label><button type="button" class="btn ghost" id="x1" hidden>ลบรูป</button></div>
+          <input id="p1c" type="file" accept="image/*" capture="environment" hidden><input id="p1g" type="file" accept="image/*" hidden></div></div>
+      <div class="f"><label for="reason">Reason <span class="req">*</span></label><textarea id="reason" required placeholder="สาเหตุที่ทำให้เกิดปัญหา"></textarea><span class="err"></span></div>
+      <div class="f"><label for="sol">Solution <span class="req">*</span></label><textarea id="sol" required placeholder="วิธีแก้ไขที่ทำ / อะไหล่ที่เปลี่ยน"></textarea><span class="err"></span></div>
+      <div class="f"><label>Picture of solution <span class="opt">(ไม่บังคับ)</span></label>
+        <div class="pic"><div class="ph" id="pv2">ยังไม่มีรูป</div>
+          <div class="picbtns"><label class="btn ghost" for="p2c">ถ่ายรูป</label><label class="btn ghost" for="p2g">เลือกจากคลัง</label><button type="button" class="btn ghost" id="x2" hidden>ลบรูป</button></div>
+          <input id="p2c" type="file" accept="image/*" capture="environment" hidden><input id="p2g" type="file" accept="image/*" hidden></div></div>
+    </section>
+
+    <div class="actions">
+      <small id="hint">ช่องที่มี * ต้องกรอก · รูปไม่บังคับ · ไม่มีเน็ตก็ส่งได้ ระบบเก็บไว้แล้วส่งเอง</small>
+      <button type="submit" class="btn pri" id="go">ส่งรายงาน</button>
+    </div>
+  </form>
+
+  <section id="v-list" hidden>
+    <p class="note">ใบที่ทำจากเครื่องนี้ 30 ใบล่าสุด · คัดลอกข้อความไปวางใน LINE ได้ ลิงก์รูปจะมาหลังส่งเข้า Drive สำเร็จ</p>
+    <div id="list"></div>
+  </section>
+</main>
+
+<div class="pinwrap" id="pinWrap" hidden>
+  <form class="pinbox" id="pinForm">
+    <h2>ใส่ PIN ของเครื่อง</h2>
+    <p>ใส่ครั้งเดียว เครื่องจะจำไว้ (ขอ PIN จากหัวหน้างาน)</p>
+    <input id="pinIn" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN">
+    <div class="pinerr" id="pinErr" role="alert"></div>
+    <button class="btn pri" type="submit" id="pinOk" style="width:100%;margin-top:10px">ตกลง</button>
+  </form>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="config.js"></script>
+<script src="store.js"></script>
+<script src="api.js"></script>
+<script src="repair.js"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>
