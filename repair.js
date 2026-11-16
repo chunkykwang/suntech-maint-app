@@ -1,16 +1,18 @@
 /* แจ้งซ่อม — v1 offline
- * ขั้นตอน: เลือกชื่อผู้ใช้ (admin ต้องใส่รหัส ตรวจที่เซิร์ฟเวอร์) -> เมนู
- *   1 ใบแจ้งซ่อมใหม่   2 งานรอปิด (งานที่ admin จ่ายให้ตัวเอง)   3 ใบที่ส่งแล้ว   4 จ่ายงาน (เฉพาะ admin)
+ * ผู้ใช้เข้าสู่ระบบที่หน้าแรก (session.js) -> เมนู
+ *   1 ใบแจ้งซ่อมใหม่   2 งานรอปิด (งานที่ admin จ่ายให้ตัวเอง)   3 ใบแจ้งซ่อมที่ส่งแล้ว   4 จ่ายงาน (เฉพาะ admin)
  * รายชื่อช่าง/เครื่อง/Sector เก็บในเครื่อง (Store 'repair.init'), งานรอปิด ('repair.jobs')
  * ใบแจ้งซ่อม/การจ่ายงาน เข้าคิว 'repair.outbox' แล้วส่งเองเมื่อมีเน็ต — ส่งซ้ำไม่บันทึกซ้ำ (submitId)
- * ใบที่ส่งแล้ว 30 ใบล่าสุดเก็บใน 'repair.sent' พร้อมข้อความ LINE
+ * ใบที่ส่งแล้ว 30 ใบล่าสุดเก็บใน 'repair.sent' (ข้อมูลทั้งใบ + ข้อความ LINE + ลิงก์รูป)
+ * ลิงก์ไฟล์ใน Drive มาจาก repair.init (sheetUrl) — ไม่ใส่ ID ไฟล์ไว้ใน repo
  */
 (function () {
   'use strict';
+  if (!Session.require()) return;
   var $ = function (id) { return document.getElementById(id); };
-  var OTHER = 'อื่นๆ (ระบุ)', ADMIN = 'admin';
+  var OTHER = 'อื่นๆ (ระบุ)', ADMIN = Session.ADMIN;
   var M = null, OUTBOX = [], SENT = [], JOBS = [], photos = { p1: null, p2: null }, syncing = false;
-  var USER = '', MODE = 'new', JOB = null, VIEW = '';
+  var USER = Session.user(), MODE = 'new', JOB = null, VIEW = '', DETAIL = null;
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -29,7 +31,7 @@
     $('net').textContent = on ? 'ออนไลน์' : 'ออฟไลน์'; $('net').className = 'pill' + (on ? '' : ' off');
     $('pending').hidden = !OUTBOX.length; $('pending').textContent = 'รอส่ง ' + OUTBOX.length;
     $('bSync').hidden = !OUTBOX.length || !on;
-    $('whoBar').hidden = !USER; $('whoName').textContent = USER;
+    $('whoBar').hidden = !USER; $('whoName').textContent = isAdmin() ? 'admin (หัวหน้างาน)' : USER;
     var n = myJobs().length;
     $('jobsCnt').hidden = !n; $('jobsCnt').textContent = n;
     $('jobsSub').textContent = isAdmin() ? 'งานที่จ่ายแล้วยังไม่ปิด (ทุกคน)' : 'งานที่ admin จ่ายให้';
@@ -91,36 +93,23 @@
     if (M.techs.indexOf(tech) >= 0) $('tech').value = tech;
     $('mtype').innerHTML = opt('', '— เลือกประเภท —') + uniq(M.machines.map(function (m) { return m.type; })).map(function (t) { return opt(t); }).join('');
     if (mt) { $('mtype').value = mt; onType(); if (eq) { $('eq').value = eq; onEq(); } }
-    var u = $('user').value;
-    $('user').innerHTML = opt('', '— เลือกชื่อ —') + M.techs.map(function (t) { return opt(t); }).join('') + opt(ADMIN, 'admin (หัวหน้างาน)');
-    if (u) $('user').value = u;
-    if (first) {
-      var saved = ls('rr_user');
-      if (saved && (saved !== ADMIN || ls('rr_adminPw')) && (saved === ADMIN || M.techs.indexOf(saved) >= 0)) { USER = saved; show('menu'); }
-      else show('who');
-    }
+    paintDrive();
+    if (first) show('menu');
   }
 
-  /* ---------- เลือกผู้ใช้ ---------- */
-  $('user').addEventListener('change', function () { $('apwF').hidden = $('user').value !== ADMIN; $('apwErr').textContent = ''; });
-  $('bEnter').onclick = function () {
-    var u = $('user').value;
-    if (!u) { setErr($('user'), 'กรุณาเลือกชื่อ'); return; }
-    setErr($('user'), '');
-    if (u !== ADMIN) { login(u); return; }
-    var pw = $('apw').value.trim();
-    if (!pw) { $('apwErr').textContent = 'กรุณาใส่รหัส admin'; return; }
-    if (!navigator.onLine) { $('apwErr').textContent = 'ต้องมีเน็ตเพื่อตรวจรหัส admin'; return; }
-    $('bEnter').disabled = true;
-    call('repair.admin', { adminPw: pw }, 20000).then(function () {
-      $('bEnter').disabled = false; ls('rr_adminPw', pw); $('apw').value = ''; login(ADMIN);
-    }, function (er) { $('bEnter').disabled = false; $('apwErr').textContent = er.message; });
-  };
-  function login(u) { USER = u; ls('rr_user', u); if (u !== ADMIN) ls('rr_adminPw', null); paint(); show('menu'); refreshJobs(); }
+  /* ---------- ผู้ใช้ ---------- */
   $('bWho').onclick = function () {
-    USER = ''; ls('rr_user', null); ls('rr_adminPw', null);
-    $('user').value = ''; $('apwF').hidden = true; paint(); show('who');
+    if (OUTBOX.length && !confirm('ยังมี ' + OUTBOX.length + ' รายการรอส่ง (จะส่งต่อเองเมื่อเข้าใช้งานใหม่) ออกจากระบบ?')) return;
+    Session.logout();
   };
+  function driveUrl() { return M && (M.sheetUrl || M.driveUrl || M.fileUrl) || ''; }
+  function paintDrive() {
+    var u = driveUrl();
+    document.querySelectorAll('[data-drive]').forEach(function (el) {
+      el.innerHTML = u ? '<a class="btn ghost" href="' + esc(u) + '" target="_blank" rel="noopener">&#128196; เปิดไฟล์แจ้งซ่อมใน Google Drive</a>'
+        : '<span class="note">ลิงก์ไฟล์ใน Google Drive จะแสดงเมื่อมีเน็ตและเซิร์ฟเวอร์ส่งลิงก์มา</span>';
+    });
+  }
 
   /* ---------- เมนู ---------- */
   document.querySelectorAll('[data-go]').forEach(function (b) {
@@ -270,11 +259,11 @@
     var item, msg;
     if (MODE === 'assign') {
       item = collectAssign();
-      remember({ submitId: item.submitId, id: item.jobId, eq: item.eq, at: item.at, text: assignText(item), hasPhoto: false, sent: false });
+      remember({ submitId: item.submitId, id: item.jobId, eq: item.eq, at: item.at, text: assignText(item), hasPhoto: false, sent: false, rec: item });
       msg = 'จ่ายงานให้ ' + item.tech + ' แล้ว';
     } else {
       item = collect();
-      remember({ submitId: item.submitId, id: item.id, eq: item.eq, at: item.sub, text: lineText(item, {}), hasPhoto: !!(item.p1 || item.p2), sent: false });
+      remember({ submitId: item.submitId, id: item.id, eq: item.eq, at: item.sub, text: lineText(item, {}), hasPhoto: !!(item.p1 || item.p2), sent: false, rec: slim(item), links: {} });
       msg = MODE === 'close' ? 'ปิดงาน ' + item.jobId + ' แล้ว' : 'บันทึกแล้ว';
     }
     $('go').disabled = true;
@@ -331,7 +320,7 @@
         if (!navigator.onLine) { toast('ต้องมีเน็ตเพื่อยกเลิกงาน'); return; }
         if (!confirm('ยกเลิกงาน ' + j.jobId + ' (' + j.eq + ' ของ ' + j.tech + ')?')) return;
         b.disabled = true;
-        call('repair.cancel', { adminPw: ls('rr_adminPw'), jobId: j.jobId }, 30000).then(function () {
+        call('repair.cancel', { adminPw: Session.adminPw(), jobId: j.jobId }, 30000).then(function () {
           JOBS = JOBS.filter(function (x) { return x.jobId !== j.jobId; }); Store.set('repair.jobs', JOBS);
           paint(); renderJobs(); toast('ยกเลิก ' + j.jobId + ' แล้ว');
         }, function (er) { b.disabled = false; toast('ยกเลิกไม่ได้: ' + er.message); });
@@ -345,64 +334,106 @@
     SENT.unshift(item); SENT = SENT.slice(0, 30);
     return Store.set('repair.sent', SENT);
   }
+  function slim(r) { var o = Object.assign({}, r); o.hasP1 = !!r.p1; o.hasP2 = !!r.p2; delete o.p1; delete o.p2; return o; }
   function renderList() {
     var box = $('list');
     if (!SENT.length) { box.innerHTML = '<div class="empty">ยังไม่มีใบจากเครื่องนี้</div>'; return; }
     box.innerHTML = SENT.map(function (s, i) {
-      var wait = !s.sent;
-      return '<div class="item' + (wait ? ' wait' : '') + '"><div class="top"><b>' + esc(s.id) + ' · ' + esc(s.eq) + '</b>' +
-        '<span class="st">' + (wait ? 'รอส่ง' + (s.hasPhoto ? ' (มีรูป)' : '') : 'ส่งแล้ว') + '</span></div>' +
-        '<pre>' + esc(s.text) + '</pre><div class="acts">' +
-        '<button type="button" class="btn line" data-copy="' + i + '">คัดลอกข้อความ</button>' +
-        (navigator.share ? '<button type="button" class="btn ghost" data-share="' + i + '">แชร์ไป LINE</button>' : '') + '</div></div>';
+      var wait = !s.sent, r = s.rec || {}, asg = r.kind === 'assign';
+      return '<button type="button" class="item rowbtn' + (wait ? ' wait' : '') + '" data-open="' + i + '">' +
+        '<div class="top"><b>' + esc(s.id) + '</b><span class="st">' + (asg ? 'จ่ายงาน · ' : '') + (wait ? 'รอส่ง' + (s.hasPhoto ? ' (มีรูป)' : '') : 'ส่งแล้ว') + '</span></div>' +
+        '<div class="meta">' + esc(s.eq) + (r.desc ? ' · ' + esc(r.desc) : '') + '</div>' +
+        '<div class="meta">' + esc(r.tech || '') + (s.at ? ' · ' + esc(s.at) : '') + '</div>' +
+        (r.pb ? '<div class="pbl">' + esc(r.pb) + '</div>' : '') + '</button>';
     }).join('');
-    box.querySelectorAll('[data-copy]').forEach(function (b) {
-      b.onclick = function () {
-        var t = SENT[b.dataset.copy].text;
-        (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('คัดลอกแล้ว วางใน LINE ได้เลย'); }, function () { toast('กดค้างที่ข้อความแล้วเลือกคัดลอก'); });
-      };
-    });
-    box.querySelectorAll('[data-share]').forEach(function (b) {
-      b.onclick = function () { navigator.share({ text: SENT[b.dataset.share].text }).catch(function () {}); };
+    box.querySelectorAll('[data-open]').forEach(function (b) {
+      b.onclick = function () { DETAIL = SENT[b.dataset.open].submitId; show('detail'); };
     });
   }
+  function val(label, v, full) {
+    return '<div class="f' + (full ? ' full' : '') + '"><label>' + esc(label) + '</label><div class="val">' + (v ? esc(v) : '<span class="opt">—</span>') + '</div></div>';
+  }
+  function picBox(label, link, local, had) {
+    var inner = local ? '<img src="' + local + '" alt="' + esc(label) + '">'
+      : '<div class="ph">' + (had ? 'รูปอยู่ใน Drive' : 'ไม่มีรูป') + '</div>';
+    var act = link ? '<a class="btn ghost" href="' + esc(link) + '" target="_blank" rel="noopener">เปิดรูปใน Drive</a>'
+      : had && local ? '<span class="note">รอส่งเข้า Drive</span>' : '';
+    return '<div class="f"><label>' + esc(label) + '</label><div class="pic">' + inner + act + '</div></div>';
+  }
+  function renderDetail() {
+    var s = SENT.filter(function (x) { return x.submitId === DETAIL; })[0], box = $('detail');
+    if (!s) { show('list'); return; }
+    var r = s.rec, asg = r && r.kind === 'assign', q = OUTBOX.filter(function (x) { return x.submitId === s.submitId; })[0] || {}, L = s.links || {};
+    $('dTitle').textContent = s.id;
+    var st = '<div class="dstat' + (s.sent ? '' : ' wait') + '">' + (asg ? 'จ่ายงาน · ' : '') + (s.sent ? 'ส่งเข้า Drive แล้ว' : 'รอส่ง — จะส่งเองเมื่อมีเน็ต') + (s.at ? ' · ' + esc(s.at) : '') + '</div>';
+    var html = st;
+    if (!r) {
+      html += '<section class="card"><p class="note">ใบนี้ทำก่อนอัปเดต จึงมีแค่ข้อความ LINE</p></section>';
+    } else {
+      var d = (r.date || '').split('-'), dd = d.length === 3 ? d[2] + '/' + d[1] + '/' + d[0] : r.date;
+      html += '<section class="card"><h2><span class="n">1</span>ข้อมูลงาน</h2>' +
+        (r.jobId ? '<div class="jobbox"><b>' + esc(r.jobId) + '</b>' + (asg ? ' · admin จ่ายงาน' : ' · ปิดงานที่ได้รับมอบหมาย') + '</div>' : '') +
+        '<div class="row">' + val(asg ? 'มอบหมายให้' : 'ชื่อช่าง', r.tech) + val('วันที่', dd) + '</div>' +
+        '<div class="row">' + val(asg ? 'เวลารับแจ้ง' : 'เวลาเริ่ม', r.t1) + (asg ? '' : val('เวลาเสร็จงาน', r.t2)) + '</div>' +
+        (asg || r.hr == null ? '' : '<div class="down"><b>' + esc(r.hr) + '</b>ชม. เครื่องหยุด (' + esc(r.mins) + ' นาที)</div>') + '</section>';
+      html += '<section class="card"><h2><span class="n">2</span>เครื่องจักร</h2>' +
+        '<div class="row">' + val('Machine type', r.type) + val('หมายเลขเครื่อง', r.eq) + '</div>' +
+        '<div class="info"><div><span>Description</span><b>' + esc(r.desc || '—') + '</b></div><div><span>Site</span><b>' + esc(r.site || '—') + '</b></div>' +
+        '<div><span>Model</span><b>' + esc(r.model || '—') + '</b></div><div><span>Serial no.</span><b>' + esc(r.sn || '—') + '</b></div></div>' +
+        val('ปัญหาที่ได้รับแจ้ง', r.pb) + '</section>';
+      if (!asg) html += '<section class="card"><h2><span class="n">3</span>ผลการตรวจและแก้ไข</h2>' +
+        val('Sector (ส่วนของเครื่อง)', r.sec) + val('Cause of problem', r.cause) +
+        picBox('Picture of problem', L.p1, q.p1, r.hasP1) +
+        val('Reason', r.reason) + val('Solution', r.sol) +
+        picBox('Picture of solution', L.p2, q.p2, r.hasP2) + '</section>';
+    }
+    html += '<section class="card"><h2>ข้อความ LINE</h2><pre class="ltext">' + esc(s.text) + '</pre><div class="acts">' +
+      '<button type="button" class="btn line" id="dCopy">คัดลอกข้อความ</button>' +
+      (navigator.share ? '<button type="button" class="btn ghost" id="dShare">แชร์ไป LINE</button>' : '') + '</div></section>';
+    box.innerHTML = html;
+    $('dCopy').onclick = function () {
+      (navigator.clipboard ? navigator.clipboard.writeText(s.text) : Promise.reject()).then(function () { toast('คัดลอกแล้ว วางใน LINE ได้เลย'); }, function () { toast('กดค้างที่ข้อความแล้วเลือกคัดลอก'); });
+    };
+    if ($('dShare')) $('dShare').onclick = function () { navigator.share({ text: s.text }).catch(function () {}); };
+  }
+  $('bBackList').onclick = function () { show('list'); };
 
   /* ---------- ส่งคิว ---------- */
   function sync(manual) {
     if (syncing || !OUTBOX.length || !navigator.onLine || !Api.ready() || !Api.pin()) return;
     syncing = true;
     var r = OUTBOX[0], assign = r.kind === 'assign';
-    var req = assign ? call('repair.assign', { adminPw: ls('rr_adminPw'), payload: r }, 60000)
+    var req = assign ? call('repair.assign', { adminPw: Session.adminPw(), payload: r }, 60000)
                      : call('repair.submit', { payload: r }, 120000);
     req.then(function (res) {
       OUTBOX = OUTBOX.filter(function (x) { return x.submitId !== r.submitId; });
       return Store.set('repair.outbox', OUTBOX).then(function () {
         return assign
-          ? remember({ submitId: r.submitId, id: r.jobId, eq: r.eq, at: r.at, text: assignText(r), hasPhoto: false, sent: true })
-          : remember({ submitId: r.submitId, id: r.id, eq: r.eq, at: r.sub, text: lineText(r, res.links || {}), hasPhoto: !!(r.p1 || r.p2), sent: true });
+          ? remember({ submitId: r.submitId, id: r.jobId, eq: r.eq, at: r.at, text: assignText(r), hasPhoto: false, sent: true, rec: r })
+          : remember({ submitId: r.submitId, id: r.id, eq: r.eq, at: r.sub, text: lineText(r, res.links || {}), hasPhoto: !!(r.p1 || r.p2), sent: true, rec: slim(r), links: res.links || {} });
       }).then(function () {
         if (assign && !JOBS.some(function (j) { return j.jobId === r.jobId; })) JOBS.push({ jobId: r.jobId, at: r.at, by: r.by, tech: r.tech, date: r.date, t1: r.t1, type: r.type, eq: r.eq, desc: r.desc, pb: r.pb });
         if (!assign && r.jobId) JOBS = JOBS.filter(function (j) { return j.jobId !== r.jobId; });
         Store.set('repair.jobs', JOBS);
-        syncing = false; paint(); if (VIEW === 'list') renderList(); if (VIEW === 'jobs') renderJobs();
+        syncing = false; paint(); if (VIEW === 'list') renderList(); if (VIEW === 'detail') renderDetail(); if (VIEW === 'jobs') renderJobs();
         var id = assign ? r.jobId : r.id;
         toast(res.duplicate ? id + ' ส่งไปแล้วก่อนหน้า' : assign ? 'ส่งงาน ' + id + ' ให้ ' + r.tech + ' แล้ว' : 'ส่ง ' + id + ' เข้า Drive แล้ว');
         if (OUTBOX.length) sync();
       });
     }, function (er) {
       syncing = false; paint();
-      if (er.code === 'ADMIN') toast('รหัส admin ใช้ไม่ได้ — กด "เปลี่ยน" แล้วเข้าเป็น admin ใหม่ งานที่จ่ายยังรอส่งอยู่');
+      if (er.code === 'ADMIN') toast('รหัส admin ใช้ไม่ได้ — ออกจากระบบแล้วเข้าเป็น admin ใหม่ งานที่จ่ายยังรอส่งอยู่');
       else if (manual || er.code !== 'OFFLINE') toast('ยังส่งไม่ได้: ' + er.message);
     });
   }
 
   /* ---------- views ---------- */
   function show(v) {
-    if (v !== 'who' && !USER) v = 'who';
     VIEW = v;
-    $('v-who').hidden = v !== 'who'; $('v-menu').hidden = v !== 'menu';
-    $('frm').hidden = v !== 'form'; $('v-list').hidden = v !== 'list'; $('v-jobs').hidden = v !== 'jobs';
+    $('v-menu').hidden = v !== 'menu';
+    $('frm').hidden = v !== 'form'; $('v-list').hidden = v !== 'list'; $('v-jobs').hidden = v !== 'jobs'; $('v-detail').hidden = v !== 'detail';
     if (v === 'list') renderList();
+    if (v === 'detail') renderDetail();
     if (v === 'jobs') { renderJobs(); refreshJobs(); }
     paint();
     window.scrollTo(0, 0);

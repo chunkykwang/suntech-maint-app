@@ -19,7 +19,7 @@
     <span id="net" class="pill" role="status" aria-live="polite">…</span>
     <span id="pending" class="pill wait" hidden></span>
     <button id="bSync" type="button" hidden>ส่งตอนนี้</button>
-    <span class="who" id="whoBar" hidden>ผู้ใช้: <b id="whoName"></b> <button id="bWho" type="button">เปลี่ยน</button></span>
+    <span class="who" id="whoBar" hidden>ผู้ใช้: <b id="whoName"></b> <button id="bWho" type="button">ออกจากระบบ</button></span>
   </div>
 </header>
 
@@ -27,21 +27,12 @@
   <div id="loading" class="empty">กำลังโหลด…</div>
   <div id="error" class="errbox" hidden></div>
 
-  <!-- เลือกผู้ใช้ -->
-  <section id="v-who" class="card" hidden>
-    <h2>เลือกชื่อผู้ใช้</h2>
-    <div class="f"><label for="user">ชื่อ</label><select id="user"></select><span class="err"></span></div>
-    <div class="f" id="apwF" hidden><label for="apw">รหัส admin</label><input id="apw" type="password" inputmode="numeric" autocomplete="off"><span class="err" id="apwErr"></span></div>
-    <button type="button" class="btn pri" id="bEnter" style="width:100%">เข้าใช้งาน</button>
-    <p class="note" style="margin-top:10px">admin ต้องมีเน็ตตอนเข้าครั้งแรกเพื่อตรวจรหัส</p>
-  </section>
-
   <!-- เมนู -->
   <section id="v-menu" hidden>
     <div class="tiles">
       <button type="button" class="tile" data-go="new"><span class="ti">&#128221;</span><b>ใบแจ้งซ่อมใหม่</b><small>กรอกเองทั้งใบ</small></button>
       <button type="button" class="tile" data-go="jobs"><span class="ti">&#9203;</span><b>งานรอปิด</b><small id="jobsSub">งานที่ admin จ่ายให้</small><span class="cnt" id="jobsCnt" hidden></span></button>
-      <button type="button" class="tile" data-go="list"><span class="ti">&#128228;</span><b>ใบที่ส่งแล้ว</b><small>ข้อความ LINE</small></button>
+      <button type="button" class="tile" data-go="list"><span class="ti">&#128228;</span><b>ใบแจ้งซ่อมที่ส่งแล้ว</b><small>ดูรายละเอียด · ข้อความ LINE</small></button>
       <button type="button" class="tile adm" data-go="assign" id="tAssign" hidden><span class="ti">&#128203;</span><b>จ่ายงาน</b><small>เฉพาะ admin</small></button>
     </div>
   </section>
@@ -102,9 +93,16 @@
   </section>
 
   <section id="v-list" hidden>
-    <div class="vt"><button type="button" class="link" data-menu>&#8592; เมนู</button><h2>ใบที่ส่งแล้ว</h2></div>
-    <p class="note">ใบที่ทำจากเครื่องนี้ 30 ใบล่าสุด · คัดลอกข้อความไปวางใน LINE ได้ ลิงก์รูปจะมาหลังส่งเข้า Drive สำเร็จ</p>
+    <div class="vt"><button type="button" class="link" data-menu>&#8592; เมนู</button><h2>ใบแจ้งซ่อมที่ส่งแล้ว</h2></div>
+    <div class="drive" data-drive></div>
+    <p class="note">ใบที่ทำจากเครื่องนี้ 30 ใบล่าสุด · แตะที่ใบเพื่อดูรายละเอียดและคัดลอกข้อความ LINE</p>
     <div id="list"></div>
+  </section>
+
+  <section id="v-detail" hidden>
+    <div class="vt"><button type="button" class="link" id="bBackList">&#8592; ใบแจ้งซ่อมที่ส่งแล้ว</button><h2 id="dTitle"></h2></div>
+    <div class="drive" data-drive></div>
+    <div id="detail"></div>
   </section>
 </main>
 
@@ -121,6 +119,7 @@
 
 <script src="config.js"></script>
 <script src="store.js"></script>
+<script src="session.js"></script>
 <script src="api.js"></script>
 <script src="repair.js"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>

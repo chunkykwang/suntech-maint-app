@@ -1,7 +1,8 @@
-/* Suntech Maintenance App v1 — app shell (ยังไม่มีฟังก์ชันงานจริง ใช้ทดสอบการติดตั้งและ offline) */
+/* Suntech Maintenance App v1 — หน้าแรก: เข้าสู่ระบบ (เลือกชื่อ, admin ใส่รหัส) แล้วไปเมนู */
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
+  var ADMIN = Session.ADMIN, USERS = [];
 
   /* ---------- สถานะเน็ต ---------- */
   function paintNet() {
@@ -9,30 +10,90 @@
     $('net').textContent = on ? 'ออนไลน์' : 'ออฟไลน์';
     $('net').classList.toggle('off', !on);
   }
-  window.addEventListener('online', paintNet);
+  window.addEventListener('online', function () { paintNet(); loadUsers(); });
   window.addEventListener('offline', paintNet);
   paintNet();
-
-  /* ---------- ทดสอบเก็บข้อมูลในเครื่อง ---------- */
-  function getN() { try { return Number(localStorage.getItem('tapN') || 0); } catch (_) { return 0; } }
-  function setN(n) { try { localStorage.setItem('tapN', String(n)); } catch (_) {} $('tapN').textContent = n; }
-  setN(getN());
-  $('btnTap').onclick = function () { setN(getN() + 1); };
-  $('btnReset').onclick = function () { setN(0); };
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
+
+  /* ---------- PIN ของเครื่อง ---------- */
+  function askPin(msg) {
+    return new Promise(function (resolve) {
+      $('pinWrap').hidden = false; $('pinErr').textContent = msg || ''; $('pinIn').value = ''; $('pinIn').focus();
+      $('pinForm').onsubmit = function (e) {
+        e.preventDefault(); var p = $('pinIn').value.trim(); if (!p) return;
+        Api.setPin(p); $('pinOk').disabled = true;
+        Api.call('ping').then(function () { $('pinWrap').hidden = true; $('pinOk').disabled = false; resolve(); },
+          function (er) { $('pinOk').disabled = false; if (er.code === 'PIN') { Api.clearPin(); $('pinErr').textContent = er.message; } else { $('pinWrap').hidden = true; resolve(); } });
+      };
+    });
+  }
+  function call(a, p, t) {
+    return Api.call(a, p, t).catch(function (er) {
+      if (er.code === 'PIN') { Api.clearPin(); return askPin(er.message).then(function () { return Api.call(a, p, t); }); }
+      throw er;
+    });
+  }
+
+  /* ---------- รายชื่อผู้ใช้ (จากข้อมูลแจ้งซ่อม เก็บในเครื่องไว้ใช้ตอน offline) ---------- */
+  function fillUsers() {
+    var sel = $('user'), cur = sel.value;
+    sel.innerHTML = '<option value="">— เลือกชื่อ —</option>' +
+      USERS.map(function (t) { return '<option>' + String(t).replace(/[&<>"]/g, '') + '</option>'; }).join('') +
+      '<option value="' + ADMIN + '">admin (หัวหน้างาน)</option>';
+    if (cur) sel.value = cur;
+    $('lnote').textContent = USERS.length ? 'ช่างเลือกชื่อแล้วเข้าได้เลย · admin ต้องใส่รหัสและต้องมีเน็ตตอนเข้า'
+      : 'ยังไม่มีรายชื่อช่างในเครื่อง — เปิดหน้านี้ตอนมีเน็ตอย่างน้อย 1 ครั้ง';
+  }
+  function loadUsers() {
+    Store.get('repair.init').then(function (d) {
+      if (d && d.techs && !USERS.length) { USERS = d.techs; fillUsers(); }
+    }).catch(function () {});
+    if (!navigator.onLine || !Api.ready()) return;
+    var go = function () {
+      call('repair.init').then(function (d) {
+        Store.set('repair.init', d).catch(function () {});
+        USERS = (d && d.techs) || []; fillUsers();
+      }, function () {});
+    };
+    if (!Api.pin()) askPin().then(go); else go();
+  }
+
+  /* ---------- เข้าสู่ระบบ ---------- */
+  function show() {
+    var u = Session.user(), inn = !!u && (u !== ADMIN || Session.isAdmin());
+    $('v-login').hidden = inn; $('v-menu').hidden = !inn;
+    $('whoBar').hidden = !inn; $('whoName').textContent = u === ADMIN ? 'admin (หัวหน้างาน)' : u;
+    $('sub').textContent = inn ? 'เลือกงานที่ต้องการ' : 'เข้าสู่ระบบก่อนใช้งาน';
+  }
+  $('user').addEventListener('change', function () {
+    $('apwF').hidden = $('user').value !== ADMIN; $('lerr').textContent = ''; $('apw').value = '';
+  });
+  $('v-login').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = $('user').value;
+    if (!u) { $('lerr').textContent = 'กรุณาเลือกชื่อ'; $('user').focus(); return; }
+    if (u !== ADMIN) { Session.set(u); show(); return; }
+    var pw = $('apw').value.trim();
+    if (!pw) { $('lerr').textContent = 'กรุณาใส่รหัส admin'; $('apw').focus(); return; }
+    if (!navigator.onLine) { $('lerr').textContent = 'ต้องมีเน็ตเพื่อตรวจรหัส admin'; return; }
+    $('bLogin').disabled = true; $('lerr').textContent = '';
+    call('repair.admin', { adminPw: pw }, 20000).then(function () {
+      $('bLogin').disabled = false; $('apw').value = ''; Session.set(ADMIN, pw); show();
+    }, function (er) { $('bLogin').disabled = false; $('lerr').textContent = er.message || 'ตรวจรหัสไม่ได้'; });
+  });
+  $('bLogout').onclick = function () {
+    Session.clear(); $('user').value = ''; $('apwF').hidden = true; show();
+  };
+  show(); fillUsers(); loadUsers();
 
   /* ---------- ติดตั้งเป็นแอป ---------- */
   var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   var box = $('install'), deferred = null;
-  if (standalone) {
-    $('ok1').textContent = '✓';
-  } else if (isIOS) {
+  if (!standalone) {
     box.hidden = false;
-    box.innerHTML = 'iPhone: กดปุ่ม <b>แชร์</b> (สี่เหลี่ยมมีลูกศรขึ้น) ใน Safari → <b>เพิ่มไปยังหน้าจอโฮม</b> แล้วเปิดแอปจากไอคอนที่หน้าจอ';
-  } else {
-    box.hidden = false;
-    box.innerHTML = 'Android: เปิดเมนู ⋮ ของ Chrome → <b>ติดตั้งแอป</b> หรือ <b>เพิ่มลงในหน้าจอหลัก</b>';
+    box.innerHTML = isIOS ? 'ติดตั้งลง iPhone: กด <b>แชร์</b> ใน Safari → <b>เพิ่มไปยังหน้าจอโฮม</b>'
+      : 'ติดตั้งลงเครื่อง: เมนู ⋮ ของ Chrome → <b>ติดตั้งแอป</b> หรือ <b>เพิ่มลงในหน้าจอหลัก</b>';
   }
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault(); deferred = e;
@@ -40,7 +101,7 @@
     box.innerHTML = '<button type="button" id="btnInstall">ติดตั้งแอปลงเครื่อง</button>';
     $('btnInstall').onclick = function () { deferred.prompt(); deferred = null; };
   });
-  window.addEventListener('appinstalled', function () { $('ok1').textContent = '✓'; box.hidden = true; });
+  window.addEventListener('appinstalled', function () { box.hidden = true; });
 
   /* ---------- service worker + อัปเดต ---------- */
   if (!('serviceWorker' in navigator)) { $('ver').textContent = 'เบราว์เซอร์นี้ไม่รองรับโหมด offline'; return; }
@@ -53,7 +114,7 @@
         if (w.state === 'installed' && navigator.serviceWorker.controller) showUpdate(w);
       });
     });
-    navigator.serviceWorker.ready.then(function () { $('ok2').textContent = '✓'; ask(); });
+    navigator.serviceWorker.ready.then(ask);
     setInterval(function () { if (navigator.onLine) reg.update().catch(function () {}); }, 30 * 60 * 1000);
   });
   navigator.serviceWorker.addEventListener('message', function (e) {

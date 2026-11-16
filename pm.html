@@ -205,7 +205,7 @@
   <div id="loadErr" class="errs hidden" style="max-width:560px;margin:0 auto 12px"></div>
   <div class="form">
     <h2>PM Checklist</h2>
-    <div class="hint">เลือกชื่อ เดือนที่ทำ PM และเครื่องที่ได้รับมอบหมาย แล้วกด Confirm</div>
+    <div class="hint">เลือกเดือนที่ทำ PM และเครื่องที่ได้รับมอบหมาย แล้วกด Confirm (ชื่อมาจากการเข้าสู่ระบบที่หน้าแรก)</div>
 
     <div class="fld" id="gName"><label>ผู้ปฏิบัติงาน</label>
       <select id="iNameSel"></select>
@@ -277,6 +277,8 @@
 <script src="config.js"></script>
 <script src="store.js"></script>
 <script src="api.js"></script>
+<script src="session.js"></script>
+<script>Session.require();</script>
 <script src="pm-shim.js"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 <script>
@@ -368,24 +370,21 @@
     $('gName').classList.remove('err'); $('planBox').classList.remove('err'); $('idxMsg').textContent='';
   }
   function resetSelection(){SESS.type='';SESS.dept='';SESS.machine='';SESS.model='';SESS.period='';SESS.job='';}
-  function setupName(){
+  function setupName(){          // ชื่อมาจากการเข้าสู่ระบบที่หน้าแรก (session.js) — เปลี่ยนชื่อได้ที่หน้าแรกเท่านั้น
     var names=uniq(PLAN.map(function(p){return p.inspector;})).filter(function(n){return n.toLowerCase()!==ADMIN_NAME;}).sort();
+    var who=Session.isAdmin()?ADMIN_NAME:Session.user();
+    if(SESS.name!==who){ SESS.name=who; resetSelection(); ADMIN_OK=false; }
     var sel=$('iNameSel'); sel.innerHTML='';
-    sel.appendChild(h('option',{value:'',text:'-- เลือกชื่อ --'}));
-    names.forEach(function(n){sel.appendChild(h('option',{value:n,text:n}));});
-    sel.appendChild(h('option',{value:ADMIN_NAME,text:'admin (ทดสอบ)'}));
-    if(names.indexOf(SESS.name)<0 && !isAdminName()) SESS.name='';
-    if(isAdminName()) SESS.name=ADMIN_NAME;
-    sel.value=SESS.name;
+    sel.appendChild(h('option',{value:who,text:who===ADMIN_NAME?'admin (ทดสอบ)':who}));
+    sel.value=who; sel.disabled=true;
     $('noPlan').classList.toggle('hidden',names.length>0);
     $('gAdmin').classList.toggle('hidden',!(isAdminName()&&!ADMIN_OK));
-    sel.onchange=function(){
-      clearErr(); SESS.name=sel.value; resetSelection();
-      if(!isAdminName()) ADMIN_OK=false;                       // ออกจาก admin แล้วต้องใส่รหัสใหม่
-      $('gAdmin').classList.toggle('hidden',!(isAdminName()&&!ADMIN_OK));
-      $('iAdminPw').value=''; $('gAdmin').classList.remove('err');
-      renderPlan(); renderDetail(); updatePrep();
-    };
+  }
+  var AUTO_ADMIN_TRIED=false;
+  function autoAdmin(){          // admin เข้าสู่ระบบด้วยรหัสแล้ว: ลองปลดล็อกให้เอง ถ้าไม่ผ่านให้พิมพ์รหัสเอง
+    if(AUTO_ADMIN_TRIED||!isAdminName()||ADMIN_OK||!Session.adminPw()||!navigator.onLine) return;
+    AUTO_ADMIN_TRIED=true;
+    $('iAdminPw').value=Session.adminPw(); $('btnAdminUnlock').click();
   }
   function setupAdmin(){
     var types=uniq(MACHINES.map(function(m){return m.type;})).sort();
@@ -517,7 +516,7 @@
     rows.forEach(function(r){dl.appendChild(h('dt',{text:r[0]}));dl.appendChild(h('dd',{text:String(r[1])}));});
     box.appendChild(dl);
   }
-  function setupIndex(){ setupName(); setupAdmin(); setupMonth(); renderPlan(); renderDetail(); updatePrep(); }
+  function setupIndex(){ setupName(); setupAdmin(); setupMonth(); renderPlan(); renderDetail(); updatePrep(); autoAdmin(); }
 
   function confirmIndex(){
     clearErr();

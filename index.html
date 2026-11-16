@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Suntech Maintenance App</title>
-<meta name="description" content="PM checklist, Vacuum pump monitor และนับ stock part">
+<meta name="description" content="PM checklist, Vacuum pump monitor, แจ้งซ่อม และนับ stock part">
 <meta name="theme-color" content="#0f2f2a">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
@@ -20,7 +20,11 @@
     <h1>Suntech Maintenance App</h1>
     <span id="net" class="net" role="status" aria-live="polite">…</span>
   </div>
-  <p>เลือกงานที่ต้องการ</p>
+  <div class="hrow who" id="whoBar" hidden>
+    <span>ผู้ใช้: <b id="whoName"></b></span>
+    <button type="button" id="bLogout">ออกจากระบบ</button>
+  </div>
+  <p id="sub">เข้าสู่ระบบก่อนใช้งาน</p>
 </header>
 
 <div id="update" class="banner" hidden>
@@ -28,54 +32,60 @@
 </div>
 
 <main>
-  <a class="card" style="--c:var(--pm)" href="pm.html">
-    <div class="ico" aria-hidden="true">&#10003;</div>
-    <div><p class="t">PM checklist</p><p class="d">ตรวจเช็คเครื่องตามแผนรายเดือน · รูปและรายการตรวจเก็บในเครื่อง ใช้ได้ตอนไม่มีเน็ต</p></div>
-    <span class="badge" style="border-color:var(--ok);color:var(--ok)">ทดลอง</span>
-  </a>
-  <a class="card" style="--c:var(--pump)" href="pump.html">
-    <div class="ico" aria-hidden="true">&#9881;</div>
-    <div><p class="t">Vacuum pump monitor</p><p class="d">สถานะ pump ตาม S/N และประวัติการซ่อม · ดูได้ตอนไม่มีเน็ต</p></div>
-    <span class="badge" style="border-color:var(--ok);color:var(--ok)">ทดลอง</span>
-  </a>
-  <a class="card" style="--c:#c8231a" href="repair.html">
-    <div class="ico" aria-hidden="true">&#128295;</div>
-    <div><p class="t">แจ้งซ่อม</p><p class="d">ทำรายงานแจ้งซ่อม บันทึกลง Drive และส่งข้อความ LINE · ใช้ได้ตอนไม่มีเน็ต</p></div>
-    <span class="badge" style="border-color:var(--ok);color:var(--ok)">ทดลอง</span>
-  </a>
-  <a class="card" style="--c:var(--stock)" href="stock.html">
-    <div class="ico" aria-hidden="true">&#9638;</div>
-    <div><p class="t">นับ stock part</p><p class="d">นับยอด part คงเหลือรายเดือน · ใช้ได้ตอนไม่มีเน็ต</p></div>
-    <span class="badge" style="border-color:var(--ok);color:var(--ok)">ทดลอง</span>
-  </a>
+  <!-- เข้าสู่ระบบ -->
+  <form id="v-login" class="login" novalidate hidden>
+    <h2>เข้าสู่ระบบ</h2>
+    <div class="lf"><label for="user">ชื่อผู้ใช้</label><select id="user"><option value="">— เลือกชื่อ —</option></select></div>
+    <div class="lf" id="apwF" hidden><label for="apw">รหัส admin</label><input id="apw" type="password" inputmode="numeric" autocomplete="off"></div>
+    <div class="lerr" id="lerr" role="alert"></div>
+    <button type="submit" class="lbtn" id="bLogin">เข้าใช้งาน</button>
+    <p class="lnote" id="lnote">ช่างเลือกชื่อแล้วเข้าได้เลย · admin ต้องใส่รหัสและต้องมีเน็ตตอนเข้า</p>
+  </form>
 
-  <a class="card" style="--c:var(--muted)" href="photo-test.html">
-    <div class="ico" aria-hidden="true">&#128247;</div>
-    <div><p class="t">ทดสอบรูป offline</p><p class="d">โหลดรูปเก็บในเครื่อง แล้วเปิดดูตอนไม่มีเน็ต</p></div>
-    <span class="badge">ทดสอบ</span>
-  </a>
-
-  <section class="test" aria-labelledby="testH">
-    <h2 id="testH">ทดสอบการใช้งานแบบ offline</h2>
-    <ol class="steps">
-      <li id="s1">ติดตั้งแอปลงเครื่อง <span class="ok" id="ok1"></span></li>
-      <li id="s2">เก็บตัวแอปไว้ในเครื่องแล้ว <span class="ok" id="ok2"></span></li>
-      <li>ปิด WiFi / เน็ตมือถือ แล้วปิด-เปิดแอปใหม่ ต้องยังเห็นหน้านี้</li>
-      <li>กดปุ่มด้านล่างตอนไม่มีเน็ต แล้วปิด-เปิดแอป ตัวเลขต้องยังอยู่</li>
-    </ol>
-    <div class="counter">
-      <button id="btnTap" type="button">บันทึกในเครื่อง +1</button>
-      <span>บันทึกแล้ว <b id="tapN">0</b> ครั้ง</span>
-      <button id="btnReset" type="button" class="ghost">ล้าง</button>
-    </div>
+  <!-- เมนู -->
+  <div id="v-menu" class="menu" hidden>
+    <a class="card" style="--c:var(--pm)" href="pm.html">
+      <div class="ico" aria-hidden="true">&#10003;</div>
+      <div><p class="t">PM checklist</p><p class="d">ตรวจเช็คเครื่องตามแผนรายเดือน · รูปและรายการตรวจเก็บในเครื่อง ใช้ได้ตอนไม่มีเน็ต</p></div>
+      <span class="badge" style="border-color:var(--ok);color:var(--ok)">ทดลอง</span>
+    </a>
+    <a class="card" style="--c:var(--pump)" href="pump.html">
+      <div class="ico" aria-hidden="true">&#9881;</div>
+      <div><p class="t">Vacuum pump monitor</p><p class="d">สถานะ pump ตาม S/N และประวัติการซ่อม · ดูได้ตอนไม่มีเน็ต</p></div>
+      <span class="badge" style="border-color:var(--ok);color:var(--ok)">ทดลอง</span>
+    </a>
+    <a class="card" style="--c:#c8231a" href="repair.html">
+      <div class="ico" aria-hidden="true">&#128295;</div>
+      <div><p class="t">แจ้งซ่อม</p><p class="d">ทำรายงานแจ้งซ่อม บันทึกลง Drive และส่งข้อความ LINE · ใช้ได้ตอนไม่มีเน็ต</p></div>
+      <span class="badge" style="border-color:var(--ok);color:var(--ok)">ทดลอง</span>
+    </a>
+    <a class="card" style="--c:var(--stock)" href="stock.html">
+      <div class="ico" aria-hidden="true">&#9638;</div>
+      <div><p class="t">นับ stock part</p><p class="d">นับยอด part คงเหลือรายเดือน · ใช้ได้ตอนไม่มีเน็ต</p></div>
+      <span class="badge" style="border-color:var(--ok);color:var(--ok)">ทดลอง</span>
+    </a>
     <div id="install" class="install" hidden></div>
-  </section>
+  </div>
 </main>
+
+<div class="pinwrap" id="pinWrap" hidden>
+  <form class="pinbox" id="pinForm">
+    <h2>ใส่ PIN ของเครื่อง</h2>
+    <p>ใส่ครั้งเดียว เครื่องจะจำไว้ (ขอ PIN จากหัวหน้างาน)</p>
+    <input id="pinIn" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN">
+    <div class="pinerr" id="pinErr" role="alert"></div>
+    <button class="lbtn" type="submit" id="pinOk">ตกลง</button>
+  </form>
+</div>
 
 <footer>
   <span id="ver">version …</span>
 </footer>
 
+<script src="config.js"></script>
+<script src="store.js"></script>
+<script src="api.js"></script>
+<script src="session.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -14,7 +14,8 @@ header p{margin:4px 0 0;font-size:13px;opacity:.75}
 .net.off{background:var(--off-bg);color:var(--off)}
 .banner{background:#fff4ce;color:#5c3d00;padding:10px 16px;display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:14px}
 .banner button{border:0;border-radius:8px;background:#5c3d00;color:#fff;padding:8px 14px;font:inherit;font-weight:700}
-main{max-width:560px;margin:0 auto;padding:16px 16px 24px;display:grid;gap:12px}
+main{max-width:560px;margin:0 auto;padding:16px 16px 24px}
+.menu{display:grid;gap:12px}
 .card{display:flex;gap:14px;align-items:center;text-decoration:none;color:inherit;background:var(--panel);
   border:1px solid var(--line);border-left:6px solid var(--c);border-radius:12px;padding:16px;min-height:88px}
 .card.soon{opacity:.75}
@@ -22,13 +23,23 @@ main{max-width:560px;margin:0 auto;padding:16px 16px 24px;display:grid;gap:12px}
 .t{font-size:17px;font-weight:700;margin:0}
 .d{font-size:13px;color:var(--muted);margin:3px 0 0}
 .badge{margin-left:auto;font-size:11px;border:1px solid var(--line);border-radius:999px;padding:3px 8px;color:var(--muted);white-space:nowrap}
-.test{background:var(--panel);border:1px dashed var(--line);border-radius:12px;padding:14px 16px;margin-top:6px}
-.test h2{font-size:15px;margin:0 0 8px}
-.steps{margin:0 0 12px;padding-left:20px;font-size:14px;line-height:1.7;color:var(--muted)}
-.ok{color:var(--ok);font-weight:700}
-.counter{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px}
-.counter button{border:0;border-radius:10px;background:var(--pm);color:#fff;padding:12px 16px;font:inherit;font-weight:700;min-height:46px}
-.counter button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
 .install{margin-top:12px;font-size:13px;color:var(--muted);line-height:1.6}
 .install button{border:0;border-radius:10px;background:var(--brand);color:#fff;padding:10px 14px;font:inherit;font-weight:700;margin-top:4px}
 footer{text-align:center;font-size:12px;color:var(--muted);padding:0 16px calc(24px + env(safe-area-inset-bottom,0px))}
+.who{margin-top:8px;font-size:13px;gap:10px}.who span{flex:1;opacity:.9}.who b{opacity:1}
+.who button{border:1px solid rgba(255,255,255,.4);border-radius:999px;background:transparent;color:#fff;padding:6px 12px;font:inherit;font-weight:700;min-height:36px}
+.login{background:var(--panel);border:1px solid var(--line);border-top:5px solid var(--brand);border-radius:12px;padding:18px}
+.login h2{margin:0 0 14px;font-size:18px}
+.lf{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.lf label{font-size:14px;font-weight:600}
+.lf select,.lf input{font:inherit;font-size:16px;min-height:48px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);width:100%}
+.lf select:focus-visible,.lf input:focus-visible,.lbtn:focus-visible{outline:3px solid var(--brand);outline-offset:1px}
+.lerr{color:var(--off);font-size:13px;min-height:18px;margin-bottom:6px}
+.lbtn{width:100%;border:0;border-radius:10px;background:var(--brand);color:#fff;min-height:48px;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+.lbtn:disabled{opacity:.55}
+.lnote{font-size:13px;color:var(--muted);margin:10px 0 0}
+.pinwrap{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:80;padding:16px}
+.pinbox{background:var(--panel);color:var(--ink);border-radius:14px;padding:18px;max-width:360px;width:100%}
+.pinbox h2{margin:0 0 6px;font-size:18px}.pinbox p{margin:0 0 12px;font-size:13px;color:var(--muted)}
+.pinbox input{width:100%;font-size:22px;letter-spacing:6px;text-align:center;min-height:48px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);margin-bottom:4px}
+.pinerr{color:var(--off);font-size:13px;min-height:18px;margin-bottom:8px}
