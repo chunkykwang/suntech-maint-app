@@ -13,7 +13,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var OTHER = 'อื่นๆ (ระบุ)', ADMIN = Session.ADMIN;
   var M = null, OUTBOX = [], SENT = [], JOBS = [], photos = { p1: null, p2: null }, syncing = false;
-  var USER = Session.user(), MODE = 'new', JOB = null, VIEW = '', DETAIL = null;
+  var USER = Session.user(), MODE = 'new', JOB = null, VIEW = '', DETAIL = null, LAST_ASSIGN = null;
   var ALL = [], ALL_AT = '', ALL_ERR = '', ALL_LOADING = false;   // admin: ใบแจ้งซ่อมทุกใบจากเซิร์ฟเวอร์ (repair.list)
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -124,7 +124,7 @@
   document.querySelectorAll('[data-menu]').forEach(function (b) { b.onclick = function () { show('menu'); }; });
 
   /* ---------- ฟอร์ม (3 แบบ: new = ใบใหม่ / assign = จ่ายงาน / close = ปิดงานที่ได้รับ) ---------- */
-  function openForm(mode, job) {
+  function openForm(mode, job, presetTech) {
     if (!M) return;
     MODE = mode; JOB = job || null;
     resetForm();
@@ -139,7 +139,7 @@
       : 'ช่องที่มี * ต้องกรอก · รูปไม่บังคับ · ไม่มีเน็ตก็ส่งได้ ระบบเก็บไว้แล้วส่งเอง';
     // ชื่อช่าง: ช่างล็อกเป็นชื่อตัวเอง / admin เลือกได้ / ปิดงาน = ผู้ได้รับมอบหมาย
     var lockTech = close || !isAdmin();
-    $('tech').value = close ? job.tech : (isAdmin() ? '' : USER);
+    $('tech').value = close ? job.tech : (isAdmin() ? (presetTech || '') : USER);
     $('tech').disabled = lockTech; $('tech').classList.toggle('ro', lockTech);
     ['mtype', 'eq'].forEach(function (i) { $(i).classList.toggle('ro', close); });
     $('pb').readOnly = close; $('pb').classList.toggle('ro', close);
@@ -274,6 +274,7 @@
     Store.set('repair.outbox', OUTBOX).then(function () {
       $('go').disabled = false;
       toast(msg + (navigator.onLine ? ' กำลังส่ง…' : ' — เก็บในเครื่อง จะส่งเมื่อมีเน็ต'));
+      LAST_ASSIGN = item.kind === 'assign' ? item : null;
       resetForm(); paint(); show(item.kind === 'assign' ? 'jobs' : 'list'); sync();
     }, function (e) { OUTBOX.pop(); $('go').disabled = false; toast('บันทึกในเครื่องไม่ได้: ' + e.message); });
   });
@@ -303,6 +304,13 @@
   }
   function renderJobs() {
     var L = myJobs();
+    // หลังกดจ่ายงาน: แจ้งผล + ปุ่มจ่ายงานหัวข้อใหม่ (ไม่ต้องกลับไปเมนู)
+    $('bNewJob').hidden = !isAdmin();
+    $('assignOk').hidden = !(isAdmin() && LAST_ASSIGN);
+    if (isAdmin() && LAST_ASSIGN) {
+      $('assignOkTxt').textContent = '✓ จ่ายงาน ' + LAST_ASSIGN.jobId + ' (' + LAST_ASSIGN.eq + ') ให้ ' + LAST_ASSIGN.tech + ' แล้ว';
+      $('bAgainSame').textContent = 'จ่ายงานให้ ' + LAST_ASSIGN.tech + ' อีก';
+    }
     $('jobsNote').textContent = isAdmin() ? 'งานที่จ่ายแล้วยังไม่ปิดของทุกคน · admin ยกเลิกงานที่จ่ายผิดได้ (ต้องมีเน็ต)'
       : 'งานที่ admin จ่ายให้ ' + USER + ' · กด "ปิดงาน" เพื่อกรอกผลการตรวจและแก้ไข';
     if (!L.length) { $('jobs').innerHTML = '<div class="empty">ไม่มีงานรอปิด</div>'; return; }
@@ -477,7 +485,12 @@
   }
 
   /* ---------- views ---------- */
+  $('bNewJob').onclick = function () { LAST_ASSIGN = null; openForm('assign'); };
+  $('bAgain').onclick = function () { LAST_ASSIGN = null; openForm('assign'); };
+  $('bAgainSame').onclick = function () { var t = LAST_ASSIGN && LAST_ASSIGN.tech; LAST_ASSIGN = null; openForm('assign', null, t); };
+
   function show(v) {
+    if (v !== 'jobs') LAST_ASSIGN = null;
     VIEW = v;
     $('v-menu').hidden = v !== 'menu';
     $('frm').hidden = v !== 'form'; $('v-list').hidden = v !== 'list'; $('v-jobs').hidden = v !== 'jobs'; $('v-detail').hidden = v !== 'detail';

@@ -89,3 +89,8 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn:focus-visib
 .search{margin:0 0 12px}
 .lbox{background:#8cabd8;border-radius:12px;padding:10px;margin-bottom:10px}
 .lbox textarea{display:block;min-height:320px;background:#fff;color:#111;border:0;border-radius:12px 12px 12px 4px;font-size:15px;line-height:1.5}
+.vt #bNewJob{margin-left:auto}
+.btn.sm{min-height:38px;padding:0 12px;font-size:14px}
+.okbox{background:var(--ok-bg);border:1px solid var(--ok);border-radius:12px;padding:12px;margin-bottom:12px}
+.okbox p{margin:0 0 10px;font-weight:600;color:var(--ink)}
+.okbox .acts{display:flex;gap:8px;flex-wrap:wrap}

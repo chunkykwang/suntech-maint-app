@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="repair.css?v=20261116c">
+<link rel="stylesheet" href="repair.css?v=20261117a">
 </head>
 <body>
 <header>
@@ -87,7 +87,13 @@
   </form>
 
   <section id="v-jobs" hidden>
-    <div class="vt"><button type="button" class="link" data-menu>&#8592; เมนู</button><h2>งานรอปิด</h2></div>
+    <div class="vt"><button type="button" class="link" data-menu>&#8592; เมนู</button><h2>งานรอปิด</h2>
+      <button type="button" class="btn pri sm" id="bNewJob" hidden>+ จ่ายงานใหม่</button></div>
+    <div class="okbox" id="assignOk" role="status" aria-live="polite" hidden>
+      <p id="assignOkTxt"></p>
+      <div class="acts"><button type="button" class="btn pri" id="bAgain">+ จ่ายงานหัวข้อใหม่</button>
+        <button type="button" class="btn ghost" id="bAgainSame"></button></div>
+    </div>
     <p class="note" id="jobsNote"></p>
     <div id="jobs"></div>
   </section>
@@ -119,11 +125,11 @@
 </div>
 <div class="toast" id="toast" role="status"></div>
 
-<script src="config.js?v=20261116c"></script>
-<script src="store.js?v=20261116c"></script>
-<script src="session.js?v=20261116c"></script>
-<script src="api.js?v=20261116c"></script>
-<script src="repair.js?v=20261116c"></script>
+<script src="config.js?v=20261117a"></script>
+<script src="store.js?v=20261117a"></script>
+<script src="session.js?v=20261117a"></script>
+<script src="api.js?v=20261117a"></script>
+<script src="repair.js?v=20261117a"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>
