@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stock part system</title>
+<meta name="theme-color" content="#0f2f2a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="stock.css?v=20261117c">
+<link rel="stylesheet" href="parts.css?v=20261117c">
+</head>
+<body>
+<header>
+  <a class="back" href="./">&#8592; เมนูหลัก</a>
+  <div class="titlebar"><h1 id="title">Stock part system</h1></div>
+  <div class="sync">
+    <span id="net" class="pill" role="status" aria-live="polite">…</span>
+    <span id="asof" style="opacity:.75"></span>
+    <span class="who2">ผู้ใช้: <b id="whoName"></b></span>
+  </div>
+</header>
+
+<main>
+  <div id="loading" class="empty" hidden>กำลังโหลด…</div>
+  <div id="error" class="err" hidden></div>
+
+  <!-- เมนู -->
+  <section id="v-home">
+    <div class="tiles">
+      <button type="button" class="tile" data-go="list"><span class="ti">&#128269;</span><b>Part list</b><small>ดูรายการ part · ค้นหา · กรองตาม Group / เครื่อง</small></button>
+      <a class="tile" href="stock.html"><span class="ti">&#9638;</span><b>Stock counting</b><small>นับ stock รายเดือน แยก plant · ใช้ได้ตอนไม่มีเน็ต</small></a>
+      <button type="button" class="tile adm" data-go="reg" id="tReg"><span class="ti">&#128221;</span><b>Part registration <span id="lockIco" aria-hidden="true">&#128274;</span></b><small id="regSub">เฉพาะ admin</small><span class="cnt" id="waitCnt" hidden></span></button>
+    </div>
+  </section>
+
+  <!-- Part list -->
+  <section id="v-list" hidden>
+    <div class="vt"><button type="button" class="link" data-home>&#8592; เมนู</button><h2>Part list</h2></div>
+    <input class="search" id="q" type="search" placeholder="ค้นหา ชื่อ / model / Part ID / brand" aria-label="ค้นหา part">
+    <div class="slicers">
+      <label>Group<select id="fGroup"></select></label>
+      <label>Machine type<select id="fType"></select></label>
+      <label>Model<select id="fModel"></select></label>
+    </div>
+    <div class="hint" id="listHint"></div>
+    <div id="list"></div>
+  </section>
+
+  <!-- Part registration (admin) -->
+  <section id="v-reg" hidden>
+    <div class="vt"><button type="button" class="link" data-home>&#8592; เมนู</button><h2>Part registration</h2>
+      <button type="button" class="btn sm" id="bRegReload">โหลดใหม่</button></div>
+    <div class="seg" role="tablist">
+      <button role="tab" data-mode="wait" aria-selected="true">Wait approve <span id="nWait"></span></button>
+      <button role="tab" data-mode="inc" aria-selected="false">Incomplete <span id="nInc"></span></button>
+      <button role="tab" data-mode="all" aria-selected="false">Edit mode</button>
+    </div>
+    <input class="search" id="rq" type="search" placeholder="ค้นหา ชื่อ / model / Part ID" aria-label="ค้นหา part">
+    <div class="slicers">
+      <label>Group<select id="rGroup"></select></label>
+      <label>Machine type<select id="rType"></select></label>
+      <label>Model<select id="rModel"></select></label>
+    </div>
+    <div class="bulk" id="bulk" hidden><span id="bulkTxt"></span><button type="button" class="btn primary sm" id="bApproveHigh">Approve ทั้งหมดที่ Confidence High</button></div>
+    <div class="hint" id="regHint"></div>
+    <div id="regList"></div>
+  </section>
+
+  <!-- ฟอร์มแก้ part -->
+  <section id="v-form" hidden>
+    <div class="vt"><button type="button" class="link" id="fBack">&#8592; กลับ</button><h2 id="fTitle">แก้ข้อมูล part</h2></div>
+    <div class="sugbox" id="sugBox" hidden></div>
+    <div class="fcard">
+      <h3>รูป</h3>
+      <div class="photo">
+        <div class="pv" id="pv">ไม่มีรูป</div>
+        <div class="pbtn">
+          <label class="btn sm" for="fCam">ถ่ายรูป</label>
+          <label class="btn sm" for="fGal">เลือกรูป</label>
+          <button type="button" class="btn sm" id="bPaste">Paste from clipboard</button>
+          <div class="pastezone" id="pasteZone" contenteditable="true" hidden aria-label="กดค้างแล้วเลือก วาง หรือกด Ctrl+V">กดค้างตรงนี้แล้วเลือก "วาง" (หรือ Ctrl+V)</div>
+          <small class="mu" id="pvInfo">รูปจะย่อเหลือไม่เกิน 70 KB ก่อนส่ง</small>
+        </div>
+        <input id="fCam" type="file" accept="image/*" capture="environment" hidden>
+        <input id="fGal" type="file" accept="image/*" hidden>
+      </div>
+    </div>
+    <div class="fcard">
+      <h3>ข้อมูล part</h3>
+      <div class="grid2">
+        <label>Name<input id="iName"></label>
+        <label>Model<input id="iModel"></label>
+        <label>Brand<input id="iBrand" list="brandList"></label>
+        <label>Unit<input id="iUnit" list="unitList"></label>
+        <label>ราคา (Base Price)<input id="iPrice" inputmode="decimal"></label>
+        <label>Supplier<input id="iSupplier"></label>
+      </div>
+      <label class="full">Description<input id="iDesc"></label>
+      <datalist id="brandList"></datalist><datalist id="unitList"></datalist>
+      <div class="fl">Category</div><div class="chips" id="cCat"></div>
+      <div class="fl">Stock class</div><div class="chips" id="cCls"></div>
+      <div class="fl">ใช้ในแอป (Include in App)</div><div class="chips" id="cInc"></div>
+    </div>
+    <div class="fcard">
+      <h3>Group</h3>
+      <div class="chips" id="cGroup"></div>
+      <div class="addrow"><input id="newGroup" placeholder="ชื่อ group ใหม่"><button type="button" class="btn sm" id="bAddGroup">+ Add group</button></div>
+    </div>
+    <div class="fcard">
+      <h3>เครื่องจักร</h3>
+      <div class="fl">Machine type (เลือกได้หลายอัน)</div><div class="chips" id="cType"></div>
+      <div class="fl">Machine model</div><div class="chips" id="cModel"><span class="mu">เลือก Machine type ก่อน</span></div>
+      <div class="fl">Sector</div><div class="chips" id="cSector"></div>
+      <div class="addrow"><input id="newSector" placeholder="ชื่อ sector ใหม่"><select id="newSectorType" aria-label="ใช้กับ Machine type"></select><button type="button" class="btn sm" id="bAddSector">+ Add sector</button></div>
+    </div>
+    <div class="fcard">
+      <h3>Min stock แยก plant</h3>
+      <p class="mu">plant ที่ "ไม่ใช้" = part นี้ไม่อยู่ในรายการนับของ plant นั้น</p>
+      <div id="mins"></div>
+    </div>
+    <div class="factions">
+      <small class="mu" id="saveHint">ต้องต่อเน็ตเพื่อบันทึก</small>
+      <button type="button" class="btn" id="bReject" hidden>Reject</button>
+      <button type="button" class="btn primary" id="bSave">บันทึก</button>
+    </div>
+  </section>
+</main>
+
+<div class="sheet" id="detail" hidden><div class="sheetbox" id="detailBox"></div></div>
+
+<div class="pinwrap" id="pinWrap" hidden>
+  <form class="pinbox" id="pinForm">
+    <h2>ใส่ PIN ของเครื่อง</h2>
+    <p>ใส่ครั้งเดียว เครื่องจะจำไว้ (ขอ PIN จากหัวหน้างาน)</p>
+    <input id="pinIn" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN">
+    <div class="pinerr" id="pinErr" role="alert"></div>
+    <div class="row"><button class="btn primary" type="submit" id="pinOk">ตกลง</button></div>
+  </form>
+</div>
+
+<script src="session.js?v=20261117c"></script>
+<script>Session.require();</script>
+<script src="config.js?v=20261117c"></script>
+<script src="store.js?v=20261117c"></script>
+<script src="api.js?v=20261117c"></script>
+<script src="parts.js?v=20261117c"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>

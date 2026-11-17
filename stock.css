@@ -86,3 +86,9 @@ header{padding-top:calc(12px + env(safe-area-inset-top,0px))}
 .pinbox .row{display:flex;gap:8px;margin-top:12px}
 .pinbox .row .btn{flex:1}
 .pinerr{color:var(--down);font-size:13px;min-height:18px;margin-top:6px}
+.slicers2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.slicers2 select{width:100%;min-width:0;font-size:13px;padding:8px 6px}
+.minb{font-weight:700;border-radius:6px;padding:1px 7px;font-size:12px;background:var(--up-bg);color:var(--up)}
+.card.low{border-left:5px solid var(--down)}
+.card.low .minb,.lowtxt{background:var(--down-bg);color:var(--down)}
+.lowtxt{font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;display:inline-block;margin-top:4px}

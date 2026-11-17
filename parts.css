@@ -1,0 +1,71 @@
+/* Stock part system — ใช้ร่วมกับ stock.css */
+main{padding-bottom:120px}
+.who2{margin-left:auto;color:#cfe0dc}.who2 b{color:#fff}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:4px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;min-height:130px;padding:16px;border-radius:14px;
+  border:1px solid var(--line);border-top:5px solid var(--accent);background:var(--panel);color:var(--ink);font:inherit;cursor:pointer;text-decoration:none}
+.tile.adm{border-top-color:var(--brand)}
+.tile.locked{opacity:.6}
+.tile .ti{font-size:26px}.tile b{font-size:16px}.tile small{color:var(--muted);font-size:13px}
+.tile .cnt{position:absolute;top:10px;right:10px;min-width:26px;height:26px;border-radius:13px;background:var(--down);color:#fff;font-weight:700;display:grid;place-items:center;padding:0 7px;font-size:13px}
+.vt{display:flex;align-items:center;gap:10px;margin:2px 0 10px}.vt h2{margin:0;font-size:18px;flex:1}
+.link{border:0;background:none;color:var(--accent);font:inherit;font-weight:700;padding:8px 4px;cursor:pointer}
+.slicers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0}
+.slicers label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:0}
+.slicers select{width:100%;min-width:0}
+@media (max-width:420px){.slicers{grid-template-columns:1fr 1fr}.slicers label:last-child{grid-column:1/-1}}
+.pcard{display:grid;grid-template-columns:72px 1fr;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit}
+.pcard .pic{width:72px;height:72px}
+.pcard .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.tag.g{background:var(--accent-bg);color:var(--accent)}
+.tag.min{background:var(--up-bg);color:var(--up)}
+.tag.miss{background:var(--down-bg);color:var(--down)}
+.tag.hi{background:var(--up-bg);color:var(--up);font-weight:700}
+.tag.md{background:var(--warn-bg);color:var(--warn);font-weight:700}
+.tag.lo{background:var(--down-bg);color:var(--down);font-weight:700}
+.seg{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:8px}
+.seg button{flex:1;border:0;background:transparent;color:var(--ink);font:inherit;font-weight:700;padding:9px 4px;border-radius:9px;min-height:42px}
+.seg button[aria-selected=true]{background:var(--accent);color:#fff}
+.bulk{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--up-bg);border-radius:10px;padding:8px 10px;margin:6px 0;font-size:13px}
+.btn.sm{min-height:38px;padding:6px 12px;font-size:14px}
+.req{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--warn);border-radius:12px;padding:10px;margin-bottom:8px}
+.req .top{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.req .why{font-size:13px;color:var(--muted);margin:4px 0}
+.req .sg{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:13px;margin:6px 0}
+.req .sg span{color:var(--muted)}
+.req .acts{display:flex;gap:6px;flex-wrap:wrap}
+.fcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.fcard h3{margin:0 0 8px;font-size:15px}
+.fcard label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted);margin-bottom:8px}
+.fcard input,.fcard select{border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;font-size:15px;background:var(--panel);color:var(--ink);min-width:0;width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+@media (max-width:420px){.grid2{grid-template-columns:1fr}}
+.fl{font-size:13px;color:var(--muted);margin:10px 0 4px}
+.mu{color:var(--muted);font-size:13px}
+.fcard p.mu{margin:0 0 8px}
+.addrow{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.addrow input{flex:1 1 160px}
+.addrow select{flex:0 1 150px;width:auto}
+.photo{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.pv{position:relative;width:140px;height:140px;border-radius:10px;background:var(--bg);display:grid;place-items:center;overflow:hidden;color:var(--muted);font-size:12px}
+.pv img{width:100%;height:100%;object-fit:cover}
+.pv .kb{position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;border-radius:6px;padding:1px 6px}
+.pbtn{display:flex;flex-direction:column;gap:6px;align-items:flex-start;flex:1 1 160px}
+.pastezone{border:2px dashed var(--accent);border-radius:10px;padding:12px;font-size:13px;color:var(--accent);min-width:200px}
+.minrow{display:grid;grid-template-columns:60px auto 1fr;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.minrow:last-child{border-bottom:0}
+.minrow b{font-size:15px}
+.step{display:flex;gap:6px;align-items:center}
+.step button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:20px;font-weight:700}
+.step input{width:70px;text-align:center;font-size:18px}
+.step.off{opacity:.35;pointer-events:none}
+.factions{position:sticky;bottom:0;display:flex;gap:8px;align-items:center;background:var(--bg);padding:10px 0 calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+.factions small{flex:1}
+.sugbox{background:var(--warn-bg);border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px}
+.chip.sug{box-shadow:0 0 0 2px var(--warn) inset}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:70;display:flex;align-items:flex-end;justify-content:center}
+.sheetbox{background:var(--panel);color:var(--ink);width:100%;max-width:640px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.sheetbox img.big{width:100%;max-height:50vh;object-fit:contain;background:var(--bg);border-radius:10px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;margin:10px 0}
+.kv span{color:var(--muted)}
+.minrow .chips{flex-wrap:nowrap}.minrow .chip{padding:6px 10px;min-height:38px}

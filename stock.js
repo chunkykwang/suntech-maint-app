@@ -110,12 +110,32 @@
   }
   function visibleParts() {
     var q = $('q').value.trim().toLowerCase();
+    var g = $('sGroup').value, t = $('sType').value, m = $('sModel').value;
     return D.parts.filter(function (p) {
       if (p.lines.indexOf(LINE) < 0 || p.cls !== CLS) return false;
+      if (g && (p.group || '') !== g) return false;
+      if (t && (p.types || []).indexOf(t) < 0) return false;
+      if (m && (p.models || []).indexOf(m) < 0) return false;
       return !q || (p.id + ' ' + p.name + ' ' + p.model + ' ' + p.desc + ' ' + p.brand).toLowerCase().indexOf(q) >= 0;
     });
   }
+  function fillSlicers() {
+    var inLine = D.parts.filter(function (p) { return p.lines.indexOf(LINE) >= 0 && p.cls === CLS; });
+    var all = function (k) { return uniq([].concat.apply([], inLine.map(function (p) { return [].concat(p[k] || []); }))).sort(); };
+    var set = function (id, first, vals, lab) {
+      var el = $(id), v = el.value;
+      el.innerHTML = '<option value="">' + first + '</option>' + vals.map(function (x) { return '<option value="' + esc(x) + '">' + esc(lab ? lab(x) : x) + '</option>'; }).join('');
+      el.value = vals.indexOf(v) >= 0 ? v : '';
+    };
+    set('sGroup', 'ทุก Group', all('group'));
+    set('sType', 'ทุก Machine type', all('types'));
+    var t = $('sType').value;
+    set('sModel', 'ทุก Model', all('models').filter(function (x) { return !t || x.split('|')[0] === t; }), function (x) { return x.replace('|', ' '); });
+  }
+  function minOf(p) { var x = p.minBy && p.minBy[LINE]; return x === undefined || x === '' ? null : Number(x); }
+  function isLow(p, qty) { var mn = minOf(p); return mn !== null && qty !== '' && qty != null && !isNaN(Number(qty)) && Number(qty) < mn; }
   function renderList() {
+    fillSlicers();
     var ps = visibleParts(), box = $('list'), done = 0;
     box.innerHTML = '';
     if (!ps.length) box.innerHTML = '<div class="empty">ไม่มี part ใน ' + esc(lineName(LINE)) + ' / ' + esc(CLS) + '</div>';
@@ -123,7 +143,8 @@
       var k = LINE + '|' + p.id, c = D.counts[k] || {}, e = ENTRY[k], pend = pendingFor(k);
       if (c.cur || pend) done++;
       var card = document.createElement('div');
-      card.className = 'card' + (e && e.qty !== '' ? ' entered' : pend ? ' pending' : c.cur ? ' done' : '');
+      var shown = e && e.qty !== '' ? e.qty : pend ? pend.qty : c.cur ? c.cur.qty : '';
+      card.className = 'card' + (e && e.qty !== '' ? ' entered' : pend ? ' pending' : c.cur ? ' done' : '') + (isLow(p, shown) ? ' low' : '');
       var last = c.last ? '<div class="last">Last month stock: ' + esc(c.last.qty) + ' ' + esc(p.unit) + ' <span style="font-weight:400">(' + esc(c.last.month) + ')</span></div>'
                         : '<div class="last none">ยังไม่มียอดนับเดือนก่อน</div>';
       var cur = c.cur ? '<div class="cur">✓ เดือนนี้นับแล้ว ' + esc(c.cur.qty) + ' โดย ' + esc(c.cur.by) + ' · ' + esc(String(c.cur.at).slice(5, 16)) + '</div>' : '';
@@ -132,19 +153,21 @@
       card.innerHTML =
         '<div class="pic" data-photo="' + esc(p.photo) + '">' + (src ? '<img alt="" src="' + src + '">' : (p.photo ? 'รูปยังไม่โหลด' : 'ไม่มีรูป')) + '</div>' +
         '<div><div class="nm">' + esc(p.name) + '</div><div class="md">' + esc([p.model, p.desc].filter(Boolean).join(' · ')) + '</div>' +
-        '<div class="meta"><span class="tag">' + esc(p.id) + '</span>' + (p.brand ? '<span class="tag">' + esc(p.brand) + '</span>' : '') + (p.sect ? '<span class="tag">' + esc(p.sect) + '</span>' : '') + '</div>' +
-        last + cur + pd + '</div>' +
+        '<div class="meta">' + (minOf(p) !== null ? '<span class="minb">Min ' + esc(minOf(p)) + '</span>' : '') + '<span class="tag">' + esc(p.id) + '</span>' + (p.brand ? '<span class="tag">' + esc(p.brand) + '</span>' : '') + (p.sect ? '<span class="tag">' + esc(p.sect) + '</span>' : '') + '</div>' +
+        last + cur + pd + '<span class="lowtxt" ' + (isLow(p, shown) ? '' : 'hidden') + '>ต่ำกว่า Min</span></div>' +
         '<div class="qty"><input type="number" inputmode="numeric" min="0" step="1" placeholder="Confirm qty" aria-label="จำนวนที่นับ ' + esc(p.name) + '" value="' + esc(e ? e.qty : '') + '">' +
         '<button type="button" data-a="10">+10</button><button type="button" data-a="1">+1</button><button type="button" data-a="clear">Clear</button></div>' +
         '<div class="unit">หน่วย: ' + esc(p.unit || '-') + '</div>';
       var inp = card.querySelector('input');
-      inp.addEventListener('input', function () { setEntry(k, inp.value); });
+      var markLow = function () { var low = isLow(p, inp.value !== '' ? inp.value : (pend ? pend.qty : c.cur ? c.cur.qty : '')); card.classList.toggle('low', low); card.querySelector('.lowtxt').hidden = !low; };
+      inp.addEventListener('input', function () { setEntry(k, inp.value); markLow(); });
       card.querySelectorAll('.qty button').forEach(function (b) {
         b.onclick = function () {
           var a = b.dataset.a, v = inp.value === '' ? 0 : Number(inp.value) || 0;
           inp.value = a === 'clear' ? '' : String(v + Number(a));
           setEntry(k, inp.value);
           card.className = 'card' + (inp.value !== '' ? ' entered' : pend ? ' pending' : c.cur ? ' done' : '');
+          markLow();
         };
       });
       box.appendChild(card);
@@ -178,6 +201,7 @@
     }, function () { need.forEach(function (id) { delete PHOTO_REQ[id]; }); });
   }
   $('q').addEventListener('input', renderList);
+  ['sGroup', 'sType', 'sModel'].forEach(function (id) { $(id).addEventListener('change', renderList); });
   $('bCancel').onclick = function () { if (Object.keys(ENTRY).length && confirm('ล้างยอดที่กรอกไว้ทั้งหมด?')) { ENTRY = {}; renderList(); } };
 
   /* ---------- ยืนยัน ---------- */

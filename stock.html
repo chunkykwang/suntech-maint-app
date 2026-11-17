@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>นับ stock part</title>
+<title>Stock counting</title>
 <meta name="theme-color" content="#0f2f2a">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="stock.css?v=20261117b">
+<link rel="stylesheet" href="stock.css?v=20261117c">
 </head>
 <body>
 <header>
-  <a class="back" href="./">&#8592; เมนูหลัก</a>
-  <div class="titlebar"><h1>นับ stock part</h1><button class="hbtn" id="hNext" type="button" hidden>Confirm (0)</button></div>
+  <a class="back" href="parts.html">&#8592; Stock part system</a>
+  <div class="titlebar"><h1>Stock counting</h1><button class="hbtn" id="hNext" type="button" hidden>Confirm (0)</button></div>
   <div class="sync">
     <span id="net" class="pill" role="status" aria-live="polite">…</span>
     <span id="pending" class="pill wait" hidden></span>
@@ -37,6 +37,7 @@
       <div class="chips" id="lineChips"></div>
       <div class="chips" id="clsChips"></div>
       <input class="search" id="q" type="search" placeholder="ค้นหาชื่อ / model / Part ID">
+      <div class="slicers2"><select id="sGroup" aria-label="Group"></select><select id="sType" aria-label="Machine type"></select><select id="sModel" aria-label="Machine model"></select></div>
     </div>
     <div class="hint" id="countHint"></div>
     <div id="list"></div>
@@ -80,12 +81,12 @@
   </form>
 </div>
 
-<script src="session.js?v=20261117b"></script>
+<script src="session.js?v=20261117c"></script>
 <script>Session.require();</script>
-<script src="config.js?v=20261117b"></script>
-<script src="store.js?v=20261117b"></script>
-<script src="api.js?v=20261117b"></script>
-<script src="stock.js?v=20261117b"></script>
+<script src="config.js?v=20261117c"></script>
+<script src="store.js?v=20261117c"></script>
+<script src="api.js?v=20261117c"></script>
+<script src="stock.js?v=20261117c"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>
