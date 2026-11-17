@@ -273,6 +273,7 @@
     FIELDS.forEach(function (k) { data[k] = clone(p[k] == null ? (/s$/.test(k) && k !== 'cls' ? [] : '') : p[k]); });
     var sug = req ? req.suggested || {} : {};
     Object.keys(sug).forEach(function (k) { if (k in data) data[k] = clone(sug[k]); });
+    data.include = 'Y';                           // approve / บันทึกแล้ว = ขึ้นแอป (เลือก "ไม่ใช้" เองได้)
     F = { part: p, req: req || null, data: data, sug: sug, photo: null, kb: 0 };
     $('fTitle').textContent = (req ? 'ตรวจข้อมูลแนะนำ ' : 'แก้ข้อมูล ') + p.id;
     $('sugBox').hidden = !req;
