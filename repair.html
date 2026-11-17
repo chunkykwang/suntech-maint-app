@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="repair.css?v=20261117a">
+<link rel="stylesheet" href="repair.css?v=20261117b">
 </head>
 <body>
 <header>
@@ -61,6 +61,10 @@
       </div>
       <div class="info" id="info" hidden></div>
       <div class="f"><label for="pb">ปัญหาที่ได้รับแจ้ง <span class="req">*</span></label><textarea id="pb" required placeholder="อาการที่ผู้แจ้งบอก เช่น Vacuum pump Thermal relay trip"></textarea><span class="err"></span></div>
+      <div class="f" id="refF" hidden><label id="refL">รูปตัวอย่างหน้างาน <span class="opt">(ไม่บังคับ · สูงสุด 3 รูป)</span></label>
+        <div class="refs" id="refs"></div>
+        <div class="picbtns" id="refBtns"><label class="btn ghost" for="rfc">ถ่ายรูป</label><label class="btn ghost" for="rfg">เลือกจากคลัง</label></div>
+        <input id="rfc" type="file" accept="image/*" capture="environment" hidden><input id="rfg" type="file" accept="image/*" multiple hidden></div>
     </section>
 
     <section class="card" id="s3">
@@ -124,12 +128,13 @@
   </form>
 </div>
 <div class="toast" id="toast" role="status"></div>
+<div class="lightbox" id="lb" hidden><img id="lbImg" alt="รูปตัวอย่างหน้างาน"><button type="button" class="btn" id="lbX">ปิด</button></div>
 
-<script src="config.js?v=20261117a"></script>
-<script src="store.js?v=20261117a"></script>
-<script src="session.js?v=20261117a"></script>
-<script src="api.js?v=20261117a"></script>
-<script src="repair.js?v=20261117a"></script>
+<script src="config.js?v=20261117b"></script>
+<script src="store.js?v=20261117b"></script>
+<script src="session.js?v=20261117b"></script>
+<script src="api.js?v=20261117b"></script>
+<script src="repair.js?v=20261117b"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>

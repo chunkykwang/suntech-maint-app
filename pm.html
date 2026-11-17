@@ -274,12 +274,12 @@
 <div class="zoom hidden" id="ovZoom"><div class="zoomhint">แตะเพื่อปิด</div><img id="zoomImg" alt=""></div>
 <div class="toast" id="toast"></div>
 
-<script src="config.js?v=20261117a"></script>
-<script src="store.js?v=20261117a"></script>
-<script src="api.js?v=20261117a"></script>
-<script src="session.js?v=20261117a"></script>
+<script src="config.js?v=20261117b"></script>
+<script src="store.js?v=20261117b"></script>
+<script src="api.js?v=20261117b"></script>
+<script src="session.js?v=20261117b"></script>
 <script>Session.require();</script>
-<script src="pm-shim.js?v=20261117a"></script>
+<script src="pm-shim.js?v=20261117b"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 <script>
 (function(){
@@ -289,7 +289,8 @@
   var ITEMBOX = {};  // no -> {it, box}
   var ADMIN_NAME = 'admin', ADMIN_OK = false;   // โหมดทดสอบ: ปลดล็อกด้วยรหัสผ่านที่ตรวจฝั่งเซิร์ฟเวอร์
   var PHOTO_MAX_PX = 900;      // ด้านยาวสุดของรูปที่ส่ง (px) — เพิ่ม = ชัดขึ้น แต่ไฟล์ใหญ่ขึ้น/ส่งช้าลง
-  var PHOTO_QUALITY = 0.72;    // คุณภาพ JPEG 0.1–1.0
+  var PHOTO_QUALITY = 0.72;    // คุณภาพ JPEG เริ่มต้น — ลดลงเองจนรูปไม่เกิน PHOTO_MAX_KB
+  var PHOTO_MAX_KB = 60;       // ขนาดรูปสูงสุดต่อรูป (KB)
   var LAST_TAP = {k:'',t:0};   // ใช้ตรวจจับการแตะ 2 ครั้งติดกันที่ปุ่มเครื่อง
   var SESS = {name:'',month:'',dept:'',machine:'',model:'',period:'',job:'',start:'',key:'',started:false};
   var STORE_KEY = 'spco_checklist_v3';
@@ -933,10 +934,14 @@
     fr.onload=function(){
       var img=new Image();
       img.onload=function(){
-        var max=PHOTO_MAX_PX, w=img.width, hh=img.height, k=Math.min(1,max/Math.max(w,hh));
-        var cv=document.createElement('canvas'); cv.width=Math.round(w*k); cv.height=Math.round(hh*k);
-        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
-        PHOTOS[it.no]=cv.toDataURL('image/jpeg',PHOTO_QUALITY);
+        var w=img.width, hh=img.height, side=Math.min(PHOTO_MAX_PX,Math.max(w,hh)), d='';
+        for(var round=0;round<6&&!d;round++){
+          var k=side/Math.max(w,hh), cv=document.createElement('canvas'); cv.width=Math.round(w*k); cv.height=Math.round(hh*k);
+          cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+          for(var q=PHOTO_QUALITY;q>=0.4;q-=0.08){ var t=cv.toDataURL('image/jpeg',q); if((t.length-t.indexOf(',')-1)*0.75/1024<=PHOTO_MAX_KB){d=t;break;} if(round===5)d=t; }
+          side=Math.round(side*0.8);
+        }
+        PHOTOS[it.no]=d;
         if(ANS[it.no]&&ANS[it.no].v) ANS[it.no].sent=false;     // ข้อที่ส่งแล้วแต่เพิ่มรูป -> ส่งซ้ำพร้อมรูป
         refreshItem(it,box); updateProgress(); toast('เพิ่มรูป No.'+it.no+' แล้ว');
       };

@@ -13,7 +13,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var OTHER = 'อื่นๆ (ระบุ)', ADMIN = Session.ADMIN;
   var M = null, OUTBOX = [], SENT = [], JOBS = [], photos = { p1: null, p2: null }, syncing = false;
-  var USER = Session.user(), MODE = 'new', JOB = null, VIEW = '', DETAIL = null, LAST_ASSIGN = null;
+  var USER = Session.user(), MODE = 'new', JOB = null, VIEW = '', DETAIL = null, LAST_ASSIGN = null, REFS = [];
   var ALL = [], ALL_AT = '', ALL_ERR = '', ALL_LOADING = false;   // admin: ใบแจ้งซ่อมทุกใบจากเซิร์ฟเวอร์ (repair.list)
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -85,7 +85,7 @@
   function refreshJobs() {
     if (!navigator.onLine || !Api.ready() || !Api.pin()) return Promise.resolve();
     return call('repair.jobs').then(function (j) {
-      JOBS = j || []; Store.set('repair.jobs', JOBS); paint(); if (VIEW === 'jobs') renderJobs();
+      JOBS = j || []; Store.set('repair.jobs', JOBS); paint(); if (VIEW === 'jobs') renderJobs(); prefetchRefs();
     }, function () {});
   }
   function use(d) {
@@ -144,6 +144,11 @@
     ['mtype', 'eq'].forEach(function (i) { $(i).classList.toggle('ro', close); });
     $('pb').readOnly = close; $('pb').classList.toggle('ro', close);
     $('jobBox').hidden = !close;
+    REFS = []; paintRefs();
+    $('refF').hidden = !(assign || (close && job.refs && job.refs.length) || (close && job.localRefs && job.localRefs.length));
+    $('refBtns').hidden = !assign;
+    $('refL').innerHTML = assign ? 'รูปตัวอย่างหน้างาน <span class="opt">(ไม่บังคับ · สูงสุด 3 รูป)</span>' : 'รูปตัวอย่างหน้างาน (จาก admin)';
+    if (close && !$('refF').hidden) fillRefs($('refs'), job);
     if (close) {
       $('jobBox').innerHTML = '<b>' + esc(job.jobId) + '</b> · admin จ่ายงานเมื่อ ' + esc(job.at || '') + '<br>กรอกเวลาเสร็จงาน และส่วนที่ 3 ผลการตรวจและแก้ไข แล้วกดส่งปิดงาน';
       if (job.date) $('date').value = job.date;
@@ -182,19 +187,79 @@
   $('eq').addEventListener('change', onEq);
   $('sec').addEventListener('change', function () { $('secOtherF').hidden = $('sec').value !== OTHER; });
 
+  // ย่อรูปก่อนเก็บ/ส่ง: ไม่เกิน ~60 KB ต่อรูป (เดิม ~200 KB) — ลดคุณภาพก่อน ถ้ายังใหญ่ค่อยลดขนาดภาพ
+  var PHOTO_MAX_KB = 60, PHOTO_MAX_PX = 1280;
   function compress(file) {
     return new Promise(function (ok, no) {
       var img = new Image(), u = URL.createObjectURL(file);
       img.onload = function () {
-        var s = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
-        c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
-        ok(c.toDataURL('image/jpeg', 0.8));
+        URL.revokeObjectURL(u);
+        var side = Math.min(PHOTO_MAX_PX, Math.max(img.width, img.height)), d = '';
+        for (var round = 0; round < 6; round++) {
+          var s = side / Math.max(img.width, img.height), c = document.createElement('canvas');
+          c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          for (var q = 0.72; q >= 0.4; q -= 0.08) {
+            d = c.toDataURL('image/jpeg', q);
+            if (kb(d) <= PHOTO_MAX_KB) return ok(d);
+          }
+          side = Math.round(side * 0.8);
+        }
+        ok(d);
       };
       img.onerror = function () { URL.revokeObjectURL(u); no(new Error('read')); };
       img.src = u;
     });
   }
+  function kb(dataUrl) { return Math.round((dataUrl.length - dataUrl.indexOf(',') - 1) * 0.75 / 1024); }
+
+  /* ---------- รูปตัวอย่างหน้างาน (จ่ายงาน) ---------- */
+  function refHtml(src, i, removable) {
+    return '<div class="ref">' + (src ? '<img src="' + src + '" alt="รูปตัวอย่างหน้างาน ' + (i + 1) + '" data-zoom>' : 'รูปยังไม่โหลด<br>(ต้องมีเน็ต)') +
+      (removable ? '<button type="button" class="rx" data-rx="' + i + '" aria-label="ลบรูป">&times;</button>' : '') + '</div>';
+  }
+  function paintRefs() {
+    $('refs').innerHTML = REFS.map(function (d, i) { return refHtml(d, i, true); }).join('');
+    $('refBtns').hidden = REFS.length >= 3;
+    $('refs').querySelectorAll('[data-rx]').forEach(function (b) { b.onclick = function () { REFS.splice(+b.dataset.rx, 1); paintRefs(); }; });
+  }
+  ['rfc', 'rfg'].forEach(function (inp) {
+    $(inp).addEventListener('change', function () {
+      var files = Array.prototype.slice.call($(inp).files, 0, 3 - REFS.length);
+      $(inp).value = '';
+      files.reduce(function (p, f) {
+        return p.then(function () { return compress(f).then(function (d) { if (REFS.length < 3) REFS.push(d); paintRefs(); }); });
+      }, Promise.resolve()).catch(function () { toast('เปิดรูปบางรูปไม่ได้ ลองรูปอื่น'); });
+    });
+  });
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t && t.hasAttribute && t.hasAttribute('data-zoom')) { $('lbImg').src = t.src; $('lb').hidden = false; }
+  });
+  $('lbX').onclick = function () { $('lb').hidden = true; $('lbImg').src = ''; };
+  $('lb').addEventListener('click', function (e) { if (e.target === $('lb')) $('lbX').onclick(); });
+
+  // รูปของงานจากเซิร์ฟเวอร์ (fileId) เก็บในเครื่อง ช่างเปิดดูหน้างานได้แม้ไม่มีเน็ต
+  var refLoading = {};
+  function refImgs(j) {   // คืน Promise<[dataUrl|'']>
+    if (j.localRefs && j.localRefs.length) return Promise.resolve(j.localRefs);
+    if (j.refs && j.refs.length && /^data:/.test(j.refs[0])) return Promise.resolve(j.refs);   // งานที่ยังรอส่ง
+    return Promise.all((j.refs || []).map(function (id) {
+      return Store.get('repair.ref:' + id).then(function (d) { return d || fetchRef(id); }, function () { return fetchRef(id); });
+    }));
+  }
+  function fetchRef(id) {
+    if (!navigator.onLine || !Api.pin()) return Promise.resolve('');
+    if (!refLoading[id]) refLoading[id] = call('repair.jobPhoto', { id: id }, 60000).then(function (r) {
+      return Store.set('repair.ref:' + id, r.data).then(function () { return r.data; });
+    }).catch(function () { delete refLoading[id]; return ''; });
+    return refLoading[id];
+  }
+  function fillRefs(box, j, cb) {
+    refImgs(j).then(function (L) { box.innerHTML = L.map(function (d, i) { return refHtml(d, i, false); }).join(''); if (cb) cb(); });
+  }
+  function prefetchRefs() { myJobs().forEach(function (j) { (j.refs || []).forEach(function (id) { if (!/^data:/.test(id)) Store.get('repair.ref:' + id).then(function (d) { if (!d) fetchRef(id); }); }); }); }
+
   [['p1', 'pv1', 'x1'], ['p2', 'pv2', 'x2']].forEach(function (a) {
     var k = a[0], pv = a[1], x = a[2];
     [k + 'c', k + 'g'].forEach(function (inp) {
@@ -241,9 +306,10 @@
     return {
       kind: 'assign', submitId: newSid('J'), jobId: 'J-' + s.d.slice(2).replace(/-/g, '') + '-' + s.hms,
       at: s.d + ' ' + s.hm, by: ADMIN, tech: $('tech').value, date: $('date').value, t1: $('t1').value,
-      type: m.type, eq: m.eq, desc: m.desc, pb: $('pb').value.trim()
+      type: m.type, eq: m.eq, desc: m.desc, pb: $('pb').value.trim(), refs: REFS.slice()
     };
   }
+  function noRefs(o) { var c = Object.assign({}, o); delete c.refs; return c; }
   function lineText(r, links) {
     var d = r.date.split('-');
     return ['[แจ้งซ่อม] ' + r.id].concat(r.jobId ? ['งาน: ' + r.jobId] : [], ['ช่าง: ' + r.tech, 'วันที่: ' + d[2] + '/' + d[1] + '/' + d[0] + '  เวลา ' + r.t1 + ' - ' + r.t2,
@@ -262,7 +328,7 @@
     var item, msg;
     if (MODE === 'assign') {
       item = collectAssign();
-      remember({ submitId: item.submitId, id: item.jobId, eq: item.eq, at: item.at, text: assignText(item), hasPhoto: false, sent: false, rec: item });
+      remember({ submitId: item.submitId, id: item.jobId, eq: item.eq, at: item.at, text: assignText(item), hasPhoto: !!(item.refs && item.refs.length), sent: false, rec: noRefs(item) });
       msg = 'จ่ายงานให้ ' + item.tech + ' แล้ว';
     } else {
       item = collect();
@@ -281,6 +347,7 @@
   function resetForm() {
     ['pb', 'cause', 'reason', 'sol', 'secOther', 't1', 't2'].forEach(function (i) { $(i).value = ''; });
     ['x1', 'x2'].forEach(function (i) { if (!$(i).hidden) $(i).click(); });
+    REFS = []; paintRefs();
     $('mtype').value = ''; onType();
     document.querySelectorAll('[aria-invalid]').forEach(function (el) { setErr(el, ''); });
     showDown();
@@ -319,11 +386,14 @@
         '<span class="st">' + (j.queued ? 'รอส่งจากเครื่องนี้' : 'รอปิด') + '</span></div>' +
         '<div class="meta">' + esc(j.desc || '') + '</div>' +
         '<div class="meta">มอบหมายให้ <b>' + esc(j.tech) + '</b> · ' + esc(j.date) + (j.t1 ? ' ' + esc(j.t1) : '') + '</div>' +
-        '<div class="pb">' + esc(j.pb) + '</div><div class="acts">' +
+        '<div class="pb">' + esc(j.pb) + '</div>' +
+        ((j.refs && j.refs.length) || (j.localRefs && j.localRefs.length) ? '<div class="refs" data-refs="' + i + '"></div>' : '') +
+        '<div class="acts">' +
         (j.queued ? '' : '<button type="button" class="btn pri" data-close="' + i + '">ปิดงาน</button>') +
         (isAdmin() && !j.queued ? '<button type="button" class="btn ghost" data-cancel="' + i + '">ยกเลิกงาน</button>' : '') +
         '</div></div>';
     }).join('');
+    $('jobs').querySelectorAll('[data-refs]').forEach(function (b) { fillRefs(b, L[b.dataset.refs]); });
     $('jobs').querySelectorAll('[data-close]').forEach(function (b) { b.onclick = function () { openForm('close', L[b.dataset.close]); }; });
     $('jobs').querySelectorAll('[data-cancel]').forEach(function (b) {
       b.onclick = function () {
@@ -465,10 +535,10 @@
       OUTBOX = OUTBOX.filter(function (x) { return x.submitId !== r.submitId; });
       return Store.set('repair.outbox', OUTBOX).then(function () {
         return assign
-          ? remember({ submitId: r.submitId, id: r.jobId, eq: r.eq, at: r.at, text: assignText(r), hasPhoto: false, sent: true, rec: r })
+          ? remember({ submitId: r.submitId, id: r.jobId, eq: r.eq, at: r.at, text: assignText(r), hasPhoto: !!(r.refs && r.refs.length), sent: true, rec: noRefs(r) })
           : remember({ submitId: r.submitId, id: r.id, eq: r.eq, at: r.sub, text: lineText(r, res.links || {}), hasPhoto: !!(r.p1 || r.p2), sent: true, rec: slim(r), links: res.links || {} });
       }).then(function () {
-        if (assign && !JOBS.some(function (j) { return j.jobId === r.jobId; })) JOBS.push({ jobId: r.jobId, at: r.at, by: r.by, tech: r.tech, date: r.date, t1: r.t1, type: r.type, eq: r.eq, desc: r.desc, pb: r.pb });
+        if (assign && !JOBS.some(function (j) { return j.jobId === r.jobId; })) JOBS.push({ jobId: r.jobId, at: r.at, by: r.by, tech: r.tech, date: r.date, t1: r.t1, type: r.type, eq: r.eq, desc: r.desc, pb: r.pb, localRefs: r.refs || [] });
         if (!assign && r.jobId) JOBS = JOBS.filter(function (j) { return j.jobId !== r.jobId; });
         if (!assign && isAdmin()) { ALL_AT = ''; if (VIEW === 'list' || VIEW === 'detail') setTimeout(function () { loadAll(true); }, 0); }
         Store.set('repair.jobs', JOBS);
