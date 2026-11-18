@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var D = null, R = null, PHOTOS = {}, PHOTO_REQ = {}, VIEW = 'home', MODE = 'wait';
+  var D = null, R = null, PHOTOS = {}, PHOTO_REQ = {}, VIEW = 'home', MODE = 'new';
   var F = null;                                   // ฟอร์ม: {part, req, data, photo}
   var PHOTO_MAX_KB = 60, CATS = ['0', 'Repair', 'TG', 'N/A'], CLSS = ['Normal', 'PSM'], PLANTS = ['SU1', 'SU2', 'SU3'];
   var ADMIN = Session.isAdmin();
@@ -25,7 +25,7 @@
     $('tReg').classList.toggle('locked', !ADMIN);
     $('lockIco').hidden = ADMIN;
     $('regSub').textContent = ADMIN ? 'Wait approve · Incomplete data · แก้ข้อมูล part' : 'เฉพาะ admin';
-    var w = R ? R.requests.length : 0;
+    var w = R ? ['new', 'edit', 'quick', 'na'].reduce(function (n, k) { return n + reqsOf(k).length; }, 0) : 0;
     $('waitCnt').hidden = !ADMIN || !w; $('waitCnt').textContent = w;
   }
   window.addEventListener('online', function () { paint(); refreshList(); });
@@ -119,6 +119,20 @@
       return !q || [p.id, p.name, p.model, p.desc, p.brand].join(' ').toLowerCase().indexOf(q) >= 0;
     });
   }
+  // R6: แสดง Name · Brand · Model คู่กันเสมอ / R7: tag ตาม Manage type
+  function lbl(p) { return [p.name, p.brand, p.model].map(function (x) { return String(x || '').trim(); }).filter(function (x) { return x && x !== '-'; }).join(' · '); }
+  function manTag(m) {
+    if (!m) return '';
+    var c = m === 'Control' ? 'ctl' : m === 'Uncontrol' ? 'unc' : 'na';
+    return '<span class="tag man ' + c + '">' + esc(m) + '</span>';
+  }
+  function ohTags(p) {
+    if (!p.onhand) return '';
+    return PLANTS.filter(function (pl) { return p.onhand[pl] && p['min' + pl] !== ''; }).map(function (pl) {
+      var o = p.onhand[pl], low = p['min' + pl] !== '' && o.qty < Number(p['min' + pl]);
+      return '<span class="tag ' + (low ? 'miss' : 'oh') + '">' + pl + ' คงเหลือ ' + o.qty + '</span>';
+    }).join('');
+  }
   function minTags(p) {
     return PLANTS.filter(function (pl) { return p['min' + pl] !== '' && p['min' + pl] != null; })
       .map(function (pl) { return '<span class="tag min">' + pl + ' min ' + esc(p['min' + pl]) + '</span>'; }).join('');
@@ -133,9 +147,9 @@
     $('list').innerHTML = ps.length ? '' : '<div class="empty">ไม่พบ part</div>';
     ps.slice(0, 300).forEach(function (p) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'pcard';
-      b.innerHTML = picHtml(p) + '<div><div class="nm">' + esc(p.name) + '</div><div class="md">' + esc([p.model, p.brand].filter(Boolean).join(' · ')) + '</div>' +
-        '<div class="tags"><span class="tag">' + esc(p.id) + '</span>' + (p.group ? '<span class="tag g">' + esc(p.group) + '</span>' : '') +
-        p.types.map(function (t) { return '<span class="tag">' + esc(typeLabel(D, t)) + '</span>'; }).join('') + minTags(p) + '</div></div>';
+      b.innerHTML = picHtml(p) + '<div><div class="nm">' + esc(lbl(p)) + '</div>' + (p.desc ? '<div class="md">' + esc(p.desc) + '</div>' : '') +
+        '<div class="tags"><span class="tag">' + esc(p.id) + '</span>' + manTag(p.manage) + (p.group ? '<span class="tag g">' + esc(p.group) + '</span>' : '') +
+        p.types.map(function (t) { return '<span class="tag">' + esc(typeLabel(D, t)) + '</span>'; }).join('') + minTags(p) + ohTags(p) + '</div></div>';
       b.onclick = function () { openDetail(p); };
       $('list').appendChild(b);
     });
@@ -147,11 +161,14 @@
     var src = p.photo && PHOTOS[p.photo];
     var row = function (k, v) { return v ? '<span>' + k + '</span><b>' + esc(v) + '</b>' : ''; };
     $('detailBox').innerHTML = (src ? '<img class="big" alt="" src="' + src + '">' : '') +
-      '<h2 style="margin:10px 0 2px">' + esc(p.name) + '</h2><div class="mu">' + esc(p.id) + '</div>' +
+      '<h2 style="margin:10px 0 2px">' + esc(lbl(p)) + '</h2><div class="mu">' + esc(p.id) + ' ' + manTag(p.manage) + '</div>' +
       '<div class="kv">' + row('Model', p.model) + row('Description', p.desc) + row('Brand', p.brand) + row('Unit', p.unit) +
       row('Group', p.group) + row('Machine type', p.types.map(function (t) { return typeLabel(D, t); }).join(', ')) +
       row('Machine model', p.models.map(modelLabel).join(', ')) + row('Sector', p.sectors.join(', ')) +
       row('Min stock', PLANTS.filter(function (pl) { return p['min' + pl] !== ''; }).map(function (pl) { return pl + ': ' + p['min' + pl]; }).join(' · ')) +
+      row('คงเหลือ (ประมาณ)', p.onhand ? PLANTS.filter(function (pl) { return p.onhand[pl]; }).map(function (pl) {
+        var o = p.onhand[pl]; return pl + ': ' + o.qty + (o.count !== null ? ' (นับ ' + o.count + (o.received ? ' + รับเข้า ' + o.received : '') + ')' : ' (รับเข้า ยังไม่เคยนับ)');
+      }).join(' · ') : '') +
       row('Stock class', p.cls) + row('Category', p.category) + '</div>' +
       (ADMIN ? '<button type="button" class="btn primary" id="dEdit">แก้ข้อมูล part</button> ' : '') +
       '<button type="button" class="btn" id="dClose">ปิด</button>';
@@ -191,51 +208,67 @@
   ['rq', 'rGroup', 'rType', 'rModel'].forEach(function (id) { $(id).addEventListener(id === 'rq' ? 'input' : 'change', renderReg); });
   $('bRegReload').onclick = function () { refreshReg(); };
 
-  function confTag(c) { c = String(c || '').toLowerCase(); return '<span class="tag ' + (c === 'high' ? 'hi' : c === 'medium' ? 'md' : 'lo') + '">' + esc(c ? c[0].toUpperCase() + c.slice(1) : '-') + '</span>'; }
+  function confTag(c) { c = String(c || '').toLowerCase(); return c ? '<span class="tag ' + (c === 'high' ? 'hi' : c === 'medium' ? 'md' : 'lo') + '">' + esc(c[0].toUpperCase() + c.slice(1)) + '</span>' : ''; }
   function sugRows(s) {
     var L = R, out = [];
     var add = function (k, v) { if (v !== undefined && v !== '' && !(Array.isArray(v) && !v.length)) out.push('<span>' + k + '</span><b>' + esc(Array.isArray(v) ? v.join(', ') : v) + '</b>'); };
     add('Group', s.group); add('Machine type', (s.types || []).map(function (t) { return typeLabel(L, t); }));
-    add('Machine model', (s.models || []).map(modelLabel)); add('Sector', s.sectors); add('Brand', s.brand); add('Supplier', s.supplier); add('Category', s.category);
+    add('Machine model', (s.models || []).map(modelLabel)); add('Sector', s.sectors); add('Brand', s.brand); add('Supplier', s.supplier);
+    add('Category', s.category); add('Manage type', s.manage); add('Stock class', s.cls);
+    return out.join('');
+  }
+  /* แยกรายการรอ approve ตาม Request type (R1–R3) */
+  function reqsOf(kind) {
+    return R.requests.filter(function (q) {
+      if (kind === 'new') return q.type === 'New part';
+      if (kind === 'quick') return q.type === 'Quick confirm';
+      if (kind === 'na') return q.type === 'N/A group';
+      if (kind === 'edit') return q.type === 'Edit existing' && partById(q.partId) && Object.keys(q.suggested || {}).length;
+      return false;
+    });
+  }
+  // part ใหม่ / รายการจาก PO: ใช้ข้อมูลที่แนะนำ + Detail ต้นทาง
+  function pseudo(q) {
+    var s = q.suggested || {};
+    return { id: q.partId, name: s.name || '', model: s.model || '', brand: s.brand || '', desc: s.desc || '', unit: s.unit || '',
+             types: s.types || [], models: s.models || [], sectors: s.sectors || [], group: s.group || '', manage: s.manage || q.manage || '',
+             minSU1: '', minSU2: '', minSU3: '', photo: '', include: 'Y' };
+  }
+  function reqTitle(q) {
+    var p = q.type === 'Edit existing' ? partById(q.partId) : pseudo(q);
+    return lbl(p || {}) || q.detail || q.partId;
+  }
+  function srcInfo(q) {
+    var out = [];
+    if (q.detail) out.push('<div class="src">' + esc(q.detail) + '</div>');
+    var m = [];
+    if (q.itemCate) m.push('ITEM CATE ' + esc(q.itemCate));
+    if (q.receipts && q.receipts.length) m.push('Receipts ' + q.receipts.length + ' แถว');
+    if (q.at) m.push(esc(q.at));
+    if (m.length) out.push('<div class="mu">' + m.join(' · ') + '</div>');
     return out.join('');
   }
 
   function renderReg() {
     if (!R) { $('regList').innerHTML = '<div class="empty">' + (navigator.onLine ? 'กำลังโหลด…' : 'ต้องต่อเน็ตเพื่อเปิด Part registration') + '</div>'; return; }
-    var inc = incParts();
-    $('nWait').textContent = '(' + R.requests.length + ')'; $('nInc').textContent = '(' + inc.length + ')';
-    var base = MODE === 'wait' ? R.requests.map(function (q) { return partById(q.partId); }).filter(Boolean) : MODE === 'inc' ? inc : R.parts;
-    fillSlicers(R, base, 'rGroup', 'rType', 'rModel');
-    var ps = sliced(base, 'rq', 'rGroup', 'rType', 'rModel'), show = {};
-    ps.forEach(function (p) { show[p.id] = 1; });
+    var inc = incParts(), counts = { new: reqsOf('new').length, edit: reqsOf('edit').length, quick: reqsOf('quick').length, na: reqsOf('na').length };
+    Object.keys(counts).forEach(function (k) { $('n_' + k).textContent = counts[k] ? '(' + counts[k] + ')' : ''; });
+    $('n_inc').textContent = '(' + inc.length + ')';
     var box = $('regList'); box.innerHTML = '';
     $('bulk').hidden = true;
-    if (MODE === 'wait') {
-      var reqs = R.requests.filter(function (q) { return show[q.partId]; });
-      var hi = reqs.filter(function (q) { return String(q.confidence).toLowerCase() === 'high'; });
-      $('bulk').hidden = !hi.length; $('bulkTxt').textContent = 'Confidence High ' + hi.length + ' จาก ' + reqs.length + ' รายการ';
-      $('bApproveHigh').onclick = function () { approveHigh(hi); };
-      $('regHint').textContent = reqs.length + ' รายการที่ระบบแนะนำ รอ admin ตัดสินใจ';
-      if (!reqs.length) box.innerHTML = '<div class="empty">ไม่มีรายการรอ approve</div>';
-      reqs.forEach(function (q) {
-        var p = partById(q.partId), d = document.createElement('div'); d.className = 'req';
-        d.innerHTML = '<div class="top"><b>' + esc(p.name) + ' <span class="mu">' + esc(p.id) + (p.model ? ' · ' + esc(p.model) : '') + '</span></b>' + confTag(q.confidence) + '</div>' +
-          '<div class="why">' + esc(q.reason) + '</div><div class="sg">' + sugRows(q.suggested) + '</div>' +
-          '<div class="acts"><button type="button" class="btn primary sm" data-a="ok">Approve</button><button type="button" class="btn sm" data-a="edit">แก้ก่อน</button><button type="button" class="btn sm" data-a="no">Reject</button></div>';
-        d.querySelector('[data-a=ok]').onclick = function (e) { decide(q, 'approve', null, e.target); };
-        d.querySelector('[data-a=no]').onclick = function (e) { if (confirm('Reject ข้อมูลแนะนำของ ' + p.id + '?')) decide(q, 'reject', null, e.target); };
-        d.querySelector('[data-a=edit]').onclick = function () { openForm(p, q); };
-        box.appendChild(d);
-      });
-      return;
-    }
+    var reqMode = ['new', 'edit', 'quick', 'na'].indexOf(MODE) >= 0;
+    $('regSlicers').hidden = reqMode && MODE !== 'edit';
+    if (reqMode) return renderReqs(box);
+    var base = MODE === 'inc' ? inc : R.parts;
+    fillSlicers(R, base, 'rGroup', 'rType', 'rModel');
+    var ps = sliced(base, 'rq', 'rGroup', 'rType', 'rModel');
     $('regHint').textContent = MODE === 'inc' ? ps.length + ' part (ใช้ในแอป) ที่ข้อมูลยังไม่ครบ' : ps.length + ' จาก ' + R.parts.length + ' part · แตะเพื่อแก้';
     if (!ps.length) box.innerHTML = '<div class="empty">ไม่มีรายการ</div>';
     ps.slice(0, 300).forEach(function (p) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'pcard';
       var miss = missing(p);
-      b.innerHTML = picHtml(p) + '<div><div class="nm">' + esc(p.name) + '</div><div class="md">' + esc([p.model, p.brand].filter(Boolean).join(' · ')) + '</div>' +
-        '<div class="tags"><span class="tag">' + esc(p.id) + '</span>' + (String(p.include).toUpperCase() === 'Y' ? '' : '<span class="tag">ไม่ใช้ในแอป</span>') +
+      b.innerHTML = picHtml(p) + '<div><div class="nm">' + esc(lbl(p)) + '</div>' +
+        '<div class="tags"><span class="tag">' + esc(p.id) + '</span>' + manTag(p.manage) + (String(p.include).toUpperCase() === 'Y' ? '' : '<span class="tag">ไม่ใช้ในแอป</span>') +
         (p.group ? '<span class="tag g">' + esc(p.group) + '</span>' : '') + minTags(p) +
         (MODE === 'inc' ? miss.map(function (m) { return '<span class="tag miss">ขาด ' + m + '</span>'; }).join('') : '') + '</div></div>';
       b.onclick = function () { openForm(p); };
@@ -244,40 +277,139 @@
     loadPhotos(ps.slice(0, 300));
   }
 
-  function decide(q, decision, changes, btn) {
-    if (!navigator.onLine) { toast('ต้องต่อเน็ตเพื่อบันทึก'); return Promise.resolve(); }
+  function renderReqs(box) {
+    var q0 = $('rq').value.trim().toLowerCase();
+    var reqs = reqsOf(MODE).filter(function (q) { return !q0 || [q.partId, reqTitle(q), q.detail, q.sugPartId].join(' ').toLowerCase().indexOf(q0) >= 0; });
+    var hints = { new: 'part ใหม่จาก PO — Approve (ออก Part ID จริง) / Merge กับ Part ID เดิม / Reject',
+                  edit: 'ข้อมูลที่ระบบแนะนำให้ part ที่มีอยู่แล้ว', quick: 'เจอใน Match_Memory หรือ Parts แล้ว — ตรวจคู่ที่จับได้ แล้วยืนยันทีละหลายแถว',
+                  na: 'ITEM CATE เป็น OFFI / OTHE / MISC — ไม่ออก Part ID ไม่บวก stock' };
+    $('regHint').textContent = reqs.length + ' รายการ · ' + hints[MODE];
+    if (!reqs.length) { box.innerHTML = '<div class="empty">ไม่มีรายการรอ approve</div>'; return; }
+
+    if (MODE === 'edit') {
+      var hi = reqs.filter(function (q) { return String(q.confidence).toLowerCase() === 'high'; });
+      $('bulk').hidden = !hi.length; $('bulkTxt').textContent = 'Confidence High ' + hi.length + ' จาก ' + reqs.length + ' รายการ';
+      $('bulkBtn').textContent = 'Approve ทั้งหมดที่ Confidence High';
+      $('bulkBtn').onclick = function () { approveHigh(hi); };
+    }
+    if (MODE === 'quick' || MODE === 'na') {
+      $('bulk').hidden = false;
+      var sel = function () { return [].slice.call(box.querySelectorAll('input[data-sel]:checked')).map(function (x) { return reqs[+x.dataset.sel]; }); };
+      $('bulkTxt').innerHTML = '<label class="selall"><input type="checkbox" id="selAll" checked> เลือกทั้งหมด</label>';
+      $('bulkBtn').textContent = MODE === 'quick' ? 'ยืนยันที่เลือก' : 'ยืนยันเป็น N/A ทั้งกลุ่ม';
+      $('bulkBtn').onclick = function () { decideMany(sel(), MODE === 'quick' ? 'approve' : 'na'); };
+      setTimeout(function () { $('selAll').onchange = function () { box.querySelectorAll('input[data-sel]').forEach(function (x) { x.checked = $('selAll').checked; }); }; });
+    }
+
+    reqs.forEach(function (q, i) {
+      var d = document.createElement('div'); d.className = 'req';
+      var top = '<div class="top"><b>' + (MODE === 'quick' || MODE === 'na' ? '<input type="checkbox" data-sel="' + i + '" checked aria-label="เลือก"> ' : '') +
+        esc(reqTitle(q)) + '</b>' + confTag(q.confidence) + '</div>';
+      var body = '', acts = '';
+      if (MODE === 'edit') {
+        var p = partById(q.partId);
+        body = '<div class="mu">' + esc(p.id) + ' ' + manTag(p.manage) + '</div><div class="why">' + esc(q.reason) + '</div><div class="sg">' + sugRows(q.suggested) + '</div>';
+        acts = '<button type="button" class="btn primary sm" data-a="ok">Approve</button><button type="button" class="btn sm" data-a="edit">แก้ก่อน</button><button type="button" class="btn sm" data-a="no">Reject</button>';
+      } else if (MODE === 'new') {
+        body = '<div class="mu">' + esc(q.partId) + (q.sugPartId ? ' · ใกล้เคียง <b>' + esc(q.sugPartId) + '</b> ' + esc(lbl(partById(q.sugPartId) || {})) : '') + '</div>' +
+          srcInfo(q) + (q.reason ? '<div class="why">' + esc(q.reason) + '</div>' : '') + '<div class="sg">' + sugRows(q.suggested) + '</div>';
+        acts = '<button type="button" class="btn primary sm" data-a="new">Approve</button><button type="button" class="btn sm" data-a="merge">Merge</button><button type="button" class="btn sm" data-a="no">Reject</button>';
+      } else if (MODE === 'quick') {
+        var t = partById(q.sugPartId);
+        body = srcInfo(q) + '<div class="match">→ <b>' + esc(q.sugPartId || '?') + '</b> ' + esc(t ? lbl(t) : '(ไม่พบใน Parts)') + ' ' + manTag(t && t.manage) + '</div>';
+        acts = '<button type="button" class="btn sm" data-a="merge">เปลี่ยน Part ID</button><button type="button" class="btn sm" data-a="no">Reject</button>';
+      } else {
+        body = srcInfo(q);
+        acts = '<button type="button" class="btn sm" data-a="new">ไม่ใช่ N/A → ลงทะเบียน</button><button type="button" class="btn sm" data-a="merge">Merge</button><button type="button" class="btn sm" data-a="no">Reject</button>';
+      }
+      d.innerHTML = top + body + '<div class="acts">' + acts + '</div>';
+      var on = function (a, fn) { var b = d.querySelector('[data-a=' + a + ']'); if (b) b.onclick = fn; };
+      on('ok', function (e) { decide(q, 'approve', null, e.target); });
+      on('edit', function () { openForm(partById(q.partId), q); });
+      on('new', function () { openForm(pseudo(q), q, true); });
+      on('merge', function () { openMerge(q); });
+      on('no', function (e) { if (confirm('Reject "' + reqTitle(q) + '"? รายการนี้จะไม่ถูกเสนอซ้ำ')) decide(q, 'reject', null, e.target); });
+      box.appendChild(d);
+    });
+  }
+
+  function decide(q, decision, changes, btn, target) {
+    if (!navigator.onLine) { toast('ต้องต่อเน็ตเพื่อบันทึก'); return Promise.reject(new Error('offline')); }
     if (btn) btn.disabled = true;
-    return acall('part.decide', { reqId: q.reqId, decision: decision, changes: changes }, 60000).then(function (r) {
-      toast(q.partId + ': ' + r.status);
-      return refreshReg(true).then(function () { renderReg(); refreshList(); });
-    }, function (er) { if (btn) btn.disabled = false; toast('บันทึกไม่ได้: ' + er.message); });
+    return acall('part.decide', { reqId: q.reqId, decision: decision, changes: changes, target: target || '' }, 60000).then(function (r) {
+      toast((r.partId || q.partId) + ': ' + r.status);
+      return refreshReg(true).then(function () { renderReg(); refreshList(); return r; });
+    }, function (er) { if (btn) btn.disabled = false; toast('บันทึกไม่ได้: ' + er.message); throw er; });
+  }
+  function decideMany(list, decision) {
+    if (!list.length) { toast('ยังไม่ได้เลือกรายการ'); return; }
+    if (!navigator.onLine) { toast('ต้องต่อเน็ตเพื่อบันทึก'); return; }
+    if (!confirm((decision === 'na' ? 'ยืนยันเป็น N/A ' : 'ยืนยัน ') + list.length + ' รายการ?')) return;
+    $('bulkBtn').disabled = true;
+    acall('part.decideMany', { reqIds: list.map(function (q) { return q.reqId; }), decision: decision }, 120000).then(function (r) {
+      $('bulkBtn').disabled = false;
+      toast('ยืนยันแล้ว ' + r.done.length + ' รายการ' + (r.failed.length ? ' · ไม่ผ่าน ' + r.failed.length : ''));
+      if (r.failed.length) showErr(r.failed.join('\n'));
+      refreshReg(true).then(function () { renderReg(); refreshList(); });
+    }, function (er) { $('bulkBtn').disabled = false; toast('บันทึกไม่ได้: ' + er.message); });
   }
   function approveHigh(list) {
     if (!navigator.onLine) { toast('ต้องต่อเน็ตเพื่อบันทึก'); return; }
     if (!confirm('Approve ' + list.length + ' รายการที่ Confidence High?')) return;
-    $('bApproveHigh').disabled = true;
+    $('bulkBtn').disabled = true;
     acall('part.approveHigh', { reqIds: list.map(function (q) { return q.reqId; }) }, 120000).then(function (r) {
-      $('bApproveHigh').disabled = false;
+      $('bulkBtn').disabled = false;
       toast('Approve แล้ว ' + r.approved.length + ' รายการ');
       refreshReg(true).then(function () { renderReg(); refreshList(); });
-    }, function (er) { $('bApproveHigh').disabled = false; toast('บันทึกไม่ได้: ' + er.message); });
+    }, function (er) { $('bulkBtn').disabled = false; toast('บันทึกไม่ได้: ' + er.message); });
   }
 
+  /* ---------- Merge: เลือก Part ID เดิม (คำแนะนำ หรือค้นหา) ---------- */
+  var MQ = null;
+  function openMerge(q) {
+    MQ = q;
+    $('mTitle').textContent = 'Merge: ' + reqTitle(q);
+    $('mSrc').innerHTML = srcInfo(q);
+    $('mq').value = '';
+    renderMerge();
+    $('merge').hidden = false; $('mq').focus();
+  }
+  function renderMerge() {
+    var t = $('mq').value.trim().toLowerCase(), q = MQ, box = $('mList'); box.innerHTML = '';
+    var list = R.parts.filter(function (p) { return !t || [p.id, p.name, p.brand, p.model, p.desc].join(' ').toLowerCase().indexOf(t) >= 0; });
+    if (!t && q.sugPartId) list.sort(function (a, b) { return (b.id === q.sugPartId) - (a.id === q.sugPartId); });
+    list.slice(0, 40).forEach(function (p) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'mrow';
+      b.innerHTML = '<b>' + esc(p.id) + '</b> ' + esc(lbl(p)) + ' ' + manTag(p.manage) + (p.id === q.sugPartId ? ' <span class="tag md">แนะนำ</span>' : '');
+      b.onclick = function () {
+        if (!confirm('รวม "' + reqTitle(q) + '" เข้ากับ ' + p.id + ' ' + lbl(p) + '?')) return;
+        decide(q, 'merge', null, b, p.id).then(function () { $('merge').hidden = true; }, function () {});
+      };
+      box.appendChild(b);
+    });
+    if (!list.length) box.innerHTML = '<div class="empty">ไม่พบ part</div>';
+  }
+  $('mq').addEventListener('input', renderMerge);
+  $('mClose').onclick = function () { $('merge').hidden = true; };
+  $('merge').addEventListener('click', function (e) { if (e.target === $('merge')) $('merge').hidden = true; });
+
   /* ---------- ฟอร์ม ---------- */
-  var FIELDS = ['name', 'model', 'desc', 'brand', 'unit', 'price', 'supplier', 'category', 'cls', 'include', 'group', 'types', 'models', 'sectors', 'minSU1', 'minSU2', 'minSU3'];
+  var FIELDS = ['name', 'model', 'desc', 'brand', 'unit', 'price', 'supplier', 'category', 'cls', 'manage', 'include', 'group', 'types', 'models', 'sectors', 'minSU1', 'minSU2', 'minSU3'];
   var INPUTS = { name: 'iName', model: 'iModel', desc: 'iDesc', brand: 'iBrand', unit: 'iUnit', price: 'iPrice', supplier: 'iSupplier' };
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
-  function openForm(p, req) {
+  function openForm(p, req, isNew) {
     var data = {};
     FIELDS.forEach(function (k) { data[k] = clone(p[k] == null ? (/s$/.test(k) && k !== 'cls' ? [] : '') : p[k]); });
     var sug = req ? req.suggested || {} : {};
     Object.keys(sug).forEach(function (k) { if (k in data) data[k] = clone(sug[k]); });
     data.include = 'Y';                           // approve / บันทึกแล้ว = ขึ้นแอป (เลือก "ไม่ใช้" เองได้)
-    F = { part: p, req: req || null, data: data, sug: sug, photo: null, kb: 0 };
-    $('fTitle').textContent = (req ? 'ตรวจข้อมูลแนะนำ ' : 'แก้ข้อมูล ') + p.id;
+    F = { part: p, req: req || null, data: data, sug: sug, photo: null, kb: 0, isNew: !!isNew };
+    $('fTitle').textContent = isNew ? 'ลงทะเบียน part ใหม่ (' + p.id + ')' : (req ? 'ตรวจข้อมูลแนะนำ ' : 'แก้ข้อมูล ') + p.id;
     $('sugBox').hidden = !req;
-    if (req) $('sugBox').innerHTML = '<b>ข้อมูลที่ระบบแนะนำ</b> ' + confTag(req.confidence) + '<br>' + esc(req.reason) + '<br><span class="mu">ช่องที่มีกรอบสีส้ม = ค่าที่แนะนำ แก้ได้ก่อนกดบันทึก</span>';
+    if (req) $('sugBox').innerHTML = (isNew ? '<b>ข้อมูลจาก PO</b> ' : '<b>ข้อมูลที่ระบบแนะนำ</b> ') + confTag(req.confidence) + srcInfo(req) +
+      (req.reason ? '<div>' + esc(req.reason) + '</div>' : '') + '<span class="mu">ช่องที่มีกรอบสีส้ม = ค่าที่แนะนำ แก้ได้ก่อนกด Approve' +
+      (isNew ? ' · ต้องเลือก Manage type · Part ID จริงออกตอน Approve' : '') + '</span>';
     $('bReject').hidden = !req;
     $('bSave').textContent = req ? 'Approve' : 'บันทึก';
     Object.keys(INPUTS).forEach(function (k) { $(INPUTS[k]).value = data[k] || ''; });
@@ -307,7 +439,8 @@
   function renderFormChips() {
     var d = F.data, L = R;
     chipRow('cCat', CATS, function (v) { return d.category === v; }, function (v) { d.category = v; }, 'category');
-    chipRow('cCls', CLSS, function (v) { return d.cls === v; }, function (v) { d.cls = d.cls === v ? '' : v; });
+    chipRow('cCls', CLSS, function (v) { return d.cls === v; }, function (v) { d.cls = d.cls === v ? '' : v; }, 'cls');
+    chipRow('cMan', ['Control', 'Uncontrol', 'N/A'], function (v) { return d.manage === v; }, function (v) { d.manage = d.manage === v ? '' : v; }, 'manage');
     chipRow('cInc', [['Y', 'ใช้'], ['N', 'ไม่ใช้']], function (v) { return String(d.include).toUpperCase() === v; }, function (v) { d.include = v; });
     chipRow('cGroup', L.groups, function (v) { return d.group === v; }, function (v) { d.group = d.group === v ? '' : v; }, 'group');
     chipRow('cType', L.machines.map(function (m) { return [m.type, m.label]; }), function (v) { return d.types.indexOf(v) >= 0; }, function (v) {
@@ -414,21 +547,31 @@
   }
   $('bSave').onclick = function () {
     if (!navigator.onLine) { toast('ต้องต่อเน็ตเพื่อบันทึก'); return; }
-    var ch = changesOf(), p = F.part, req = F.req;
-    if (!Object.keys(ch).length && !F.photo && !req) { toast('ไม่มีอะไรเปลี่ยน'); return; }
+    var ch = F.isNew ? clone(F.data) : changesOf(), p = F.part, req = F.req, photo = F.photo;
+    if (F.isNew) {
+      if (!String(F.data.name || '').trim()) { toast('กรอก Name ก่อน'); $('iName').focus(); return; }
+      if (!F.data.manage) { toast('เลือก Manage type ก่อน (Control / Uncontrol / N/A)'); $('cMan').scrollIntoView({ block: 'center' }); return; }
+    }
+    if (!Object.keys(ch).length && !photo && !req) { toast('ไม่มีอะไรเปลี่ยน'); return; }
     $('bSave').disabled = true; $('saveHint').textContent = 'กำลังบันทึก…';
-    var step = F.photo ? acall('part.photo', { partId: p.id, data: F.photo }, 90000).then(function (r) { PHOTOS[r.photo] = F.photo; Store.set('stock.photos', PHOTOS); })
-                       : Promise.resolve();
-    step.then(function () {
-      if (req) return acall('part.decide', { reqId: req.reqId, decision: 'approve', changes: ch }, 60000);
-      if (Object.keys(ch).length) return acall('part.save', { partId: p.id, changes: ch }, 60000);
-    }).then(function () {
+    var upPhoto = function (pid) {
+      if (!photo) return Promise.resolve();
+      return acall('part.photo', { partId: pid, data: photo }, 90000).then(function (r) { PHOTOS[r.photo] = photo; Store.set('stock.photos', PHOTOS); });
+    };
+    var pidDone = p.id;
+    (F.isNew
+      ? acall('part.decide', { reqId: req.reqId, decision: 'approve', changes: ch }, 60000).then(function (r) { pidDone = r.partId || p.id; return upPhoto(pidDone); })
+      : upPhoto(p.id).then(function () {
+          if (req) return acall('part.decide', { reqId: req.reqId, decision: 'approve', changes: ch }, 60000);
+          if (Object.keys(ch).length) return acall('part.save', { partId: p.id, changes: ch }, 60000);
+        })
+    ).then(function () {
       $('bSave').disabled = false; $('saveHint').textContent = 'ต้องต่อเน็ตเพื่อบันทึก';
-      toast('บันทึก ' + p.id + ' แล้ว');
+      toast('บันทึก ' + pidDone + ' แล้ว');
       return refreshReg(true).then(function () { show('reg'); refreshList(); });
     }, function (er) { $('bSave').disabled = false; $('saveHint').textContent = 'ต้องต่อเน็ตเพื่อบันทึก'; toast('บันทึกไม่ได้: ' + er.message); });
   };
-  $('bReject').onclick = function () { if (F.req && confirm('Reject ข้อมูลแนะนำของ ' + F.part.id + '?')) decide(F.req, 'reject', null, $('bReject')).then(function () { show('reg'); }); };
+  $('bReject').onclick = function () { if (F.req && confirm('Reject "' + reqTitle(F.req) + '"?')) decide(F.req, 'reject', null, $('bReject')).then(function () { show('reg'); }, function () {}); };
   $('fBack').onclick = function () { show(R ? 'reg' : 'list'); };
 
   /* ---------- views ---------- */

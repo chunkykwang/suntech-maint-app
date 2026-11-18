@@ -132,6 +132,8 @@
     var t = $('sType').value;
     set('sModel', 'ทุก Model', all('models').filter(function (x) { return !t || x.split('|')[0] === t; }), function (x) { return x.replace('|', ' '); });
   }
+  function lbl(p) { return [p.name, p.brand, p.model].map(function (x) { return String(x || '').trim(); }).filter(function (x) { return x && x !== '-'; }).join(' · '); }
+  function ohOf(p) { return p.onhand && p.onhand[LINE] ? p.onhand[LINE].qty : null; }
   function minOf(p) { var x = p.minBy && p.minBy[LINE]; return x === undefined || x === '' ? null : Number(x); }
   function isLow(p, qty) { var mn = minOf(p); return mn !== null && qty !== '' && qty != null && !isNaN(Number(qty)) && Number(qty) < mn; }
   function renderList() {
@@ -152,8 +154,8 @@
       var src = p.photo && PHOTOS[p.photo];
       card.innerHTML =
         '<div class="pic" data-photo="' + esc(p.photo) + '">' + (src ? '<img alt="" src="' + src + '">' : (p.photo ? 'รูปยังไม่โหลด' : 'ไม่มีรูป')) + '</div>' +
-        '<div><div class="nm">' + esc(p.name) + '</div><div class="md">' + esc([p.model, p.desc].filter(Boolean).join(' · ')) + '</div>' +
-        '<div class="meta">' + (minOf(p) !== null ? '<span class="minb">Min ' + esc(minOf(p)) + '</span>' : '') + '<span class="tag">' + esc(p.id) + '</span>' + (p.brand ? '<span class="tag">' + esc(p.brand) + '</span>' : '') + (p.sect ? '<span class="tag">' + esc(p.sect) + '</span>' : '') + '</div>' +
+        '<div><div class="nm">' + esc(lbl(p)) + '</div>' + (p.desc ? '<div class="md">' + esc(p.desc) + '</div>' : '') +
+        '<div class="meta">' + (minOf(p) !== null ? '<span class="minb">Min ' + esc(minOf(p)) + '</span>' : '') + (ohOf(p) !== null ? '<span class="tag">คงเหลือ ~' + esc(ohOf(p)) + '</span>' : '') + '<span class="tag">' + esc(p.id) + '</span>' + (p.brand ? '<span class="tag">' + esc(p.brand) + '</span>' : '') + (p.sect ? '<span class="tag">' + esc(p.sect) + '</span>' : '') + '</div>' +
         last + cur + pd + '<span class="lowtxt" ' + (isLow(p, shown) ? '' : 'hidden') + '>ต่ำกว่า Min</span></div>' +
         '<div class="qty"><input type="number" inputmode="numeric" min="0" step="1" placeholder="Confirm qty" aria-label="จำนวนที่นับ ' + esc(p.name) + '" value="' + esc(e ? e.qty : '') + '">' +
         '<button type="button" data-a="10">+10</button><button type="button" data-a="1">+1</button><button type="button" data-a="clear">Clear</button></div>' +
@@ -219,7 +221,7 @@
         var diff = last === null || isNaN(last) ? '<span class="d eq">ใหม่</span>' :
           (q - last > 0 ? '<span class="d up">+' + (q - last) + '</span>' : (q - last < 0 ? '<span class="d down">' + (q - last) + '</span>' : '<span class="d eq">เท่าเดิม</span>'));
         var row = document.createElement('div'); row.className = 'crow';
-        row.innerHTML = '<div><div class="n">' + esc(p.name) + '</div><div class="md">' + esc(p.id + ' · ' + (p.model || '')) + '</div></div>' +
+        row.innerHTML = '<div><div class="n">' + esc(lbl(p)) + '</div><div class="md">' + esc(p.id) + '</div></div>' +
           '<div class="v">' + (last === null ? '—' : esc(last)) + ' → <b>' + esc(e.qty) + '</b> ' + esc(p.unit) + '<br>' + diff + '</div>' +
           (c.cur || pendingFor(k) ? '<div class="md" style="grid-column:1/-1;color:var(--warn)">เดือนนี้มียอดนับแล้ว (จะแทนที่ด้วยยอดใหม่)</div>' : '') +
           '<input placeholder="หมายเหตุ (ถ้ามี)" value="' + esc(e.note) + '">';
@@ -299,7 +301,7 @@
       rows.map(function (r) {
         var d = '';
         if (r.cur && r.last) { var x = Number(r.cur.qty) - Number(r.last.qty); d = x > 0 ? ' <span class="d up">+' + x + '</span>' : (x < 0 ? ' <span class="d down">' + x + '</span>' : ''); }
-        return '<tr class="' + (r.cur ? '' : 'miss') + '"><td><b>' + esc(r.p.name) + '</b><div class="md">' + esc(r.p.id + ' · ' + (r.p.model || '')) + '</div>' + (r.cur && r.cur.note ? '<div class="md">📝 ' + esc(r.cur.note) + '</div>' : '') + '</td>' +
+        return '<tr class="' + (r.cur ? '' : 'miss') + '"><td><b>' + esc(lbl(r.p)) + '</b><div class="md">' + esc(r.p.id) + '</div>' + (r.cur && r.cur.note ? '<div class="md">📝 ' + esc(r.cur.note) + '</div>' : '') + '</td>' +
           '<td>' + esc(lineName(r.l)) + '</td><td class="r">' + (r.last ? esc(r.last.qty) : '—') + '</td>' +
           '<td class="r">' + (r.cur ? '<b>' + esc(r.cur.qty) + '</b>' + d : 'ยังไม่นับ') + '</td>' +
           '<td>' + (r.cur ? esc(r.cur.by) + '<br><span class="st">' + esc(r.cur.status || 'Submitted') + '</span>' : '') + '</td></tr>';

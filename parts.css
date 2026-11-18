@@ -69,3 +69,14 @@ main{padding-bottom:120px}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;margin:10px 0}
 .kv span{color:var(--muted)}
 .minrow .chips{flex-wrap:nowrap}.minrow .chip{padding:6px 10px;min-height:38px}
+.seg{overflow-x:auto;scrollbar-width:none}.seg button{flex:1 0 auto;white-space:nowrap;padding:9px 10px}
+.tag.man.ctl{background:var(--up-bg);color:var(--up);font-weight:700}
+.tag.man.unc{background:var(--warn-bg);color:var(--warn);font-weight:700}
+.tag.man.na{background:var(--line);color:var(--muted);font-weight:700}
+.tag.oh{background:var(--accent-bg);color:var(--accent);font-weight:700}
+.req .src{font-size:13px;background:var(--bg);border-radius:8px;padding:6px 8px;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.req .match{font-size:14px;margin:6px 0}
+.req .top input{width:20px;height:20px;vertical-align:middle}
+.selall{display:inline-flex;gap:6px;align-items:center;font-weight:700}
+.selall input{width:20px;height:20px}
+.mrow{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:10px;margin-bottom:6px;font:inherit;font-size:14px;cursor:pointer}
