@@ -309,7 +309,7 @@
       type: m.type, eq: m.eq, desc: m.desc, pb: $('pb').value.trim(), refs: REFS.slice()
     };
   }
-  function noRefs(o) { var c = Object.assign({}, o); delete c.refs; return c; }
+  function noRefs(o) { var c = Object.assign({}, o); delete c.refs; delete c.apw; return c; }
   function lineText(r, links) {
     var d = r.date.split('-');
     return ['[แจ้งซ่อม] ' + r.id].concat(r.jobId ? ['งาน: ' + r.jobId] : [], ['ช่าง: ' + r.tech, 'วันที่: ' + d[2] + '/' + d[1] + '/' + d[0] + '  เวลา ' + r.t1 + ' - ' + r.t2,
@@ -328,6 +328,7 @@
     var item, msg;
     if (MODE === 'assign') {
       item = collectAssign();
+      item.apw = Session.adminPw();          // เก็บรหัส admin ไว้กับงานในเครื่องนี้ — ส่งได้แม้เปลี่ยนผู้ใช้เป็นช่างก่อนมีเน็ต
       remember({ submitId: item.submitId, id: item.jobId, eq: item.eq, at: item.at, text: assignText(item), hasPhoto: !!(item.refs && item.refs.length), sent: false, rec: noRefs(item) });
       msg = 'จ่ายงานให้ ' + item.tech + ' แล้ว';
     } else {
@@ -384,6 +385,7 @@
     $('jobs').innerHTML = L.map(function (j, i) {
       return '<div class="job"><div class="top"><b>' + esc(j.jobId) + ' · ' + esc(j.eq) + '</b>' +
         '<span class="st">' + (j.queued ? 'รอส่งจากเครื่องนี้' : 'รอปิด') + '</span></div>' +
+        (j.queued ? '<div class="meta">งานนี้ยังไม่ขึ้นระบบ — ช่างจะกดปิดงานได้หลังส่งสำเร็จ' + (j.apw || isAdmin() ? '' : ' (ต้องเข้าเป็น admin ในเครื่องนี้เพื่อส่ง)') + '</div>' : '') +
         '<div class="meta">' + esc(j.desc || '') + '</div>' +
         '<div class="meta">มอบหมายให้ <b>' + esc(j.tech) + '</b> · ' + esc(j.date) + (j.t1 ? ' ' + esc(j.t1) : '') + '</div>' +
         '<div class="pb">' + esc(j.pb) + '</div>' +
@@ -525,12 +527,15 @@
   $('bBackList').onclick = function () { show('list'); };
 
   /* ---------- ส่งคิว ---------- */
-  function sync(manual) {
+  function sync(manual, tries) {
     if (syncing || !OUTBOX.length || !navigator.onLine || !Api.ready() || !Api.pin()) return;
+    tries = tries || 0;
+    if (tries >= OUTBOX.length) return;                 // ลองครบทุกรายการแล้วในรอบนี้
     syncing = true;
     var r = OUTBOX[0], assign = r.kind === 'assign';
-    var req = assign ? call('repair.assign', { adminPw: Session.adminPw(), payload: r }, 60000)
-                     : call('repair.submit', { payload: r }, 120000);
+    var send = Object.assign({}, r); delete send.apw;
+    var req = assign ? call('repair.assign', { adminPw: r.apw || Session.adminPw(), payload: send }, 60000)
+                     : call('repair.submit', { payload: send }, 120000);
     req.then(function (res) {
       OUTBOX = OUTBOX.filter(function (x) { return x.submitId !== r.submitId; });
       return Store.set('repair.outbox', OUTBOX).then(function () {
@@ -549,8 +554,13 @@
       });
     }, function (er) {
       syncing = false; paint();
-      if (er.code === 'ADMIN') toast('รหัส admin ใช้ไม่ได้ — ออกจากระบบแล้วเข้าเป็น admin ใหม่ งานที่จ่ายยังรอส่งอยู่');
+      if (er.code === 'ADMIN') toast('ส่งงานที่จ่าย ' + r.jobId + ' ไม่ได้: ต้องเข้าเป็น admin ในเครื่องนี้ 1 ครั้งเพื่อส่ง');
       else if (manual || er.code !== 'OFFLINE') toast('ยังส่งไม่ได้: ' + er.message);
+      // รายการนี้ส่งไม่ได้ (ไม่ใช่เพราะไม่มีเน็ต) -> ย้ายไปท้ายคิว ให้รายการอื่นส่งต่อได้
+      if (er.code !== 'OFFLINE' && OUTBOX.length > 1) {
+        OUTBOX.push(OUTBOX.shift()); Store.set('repair.outbox', OUTBOX);
+        sync(manual, tries + 1);
+      }
     });
   }
 
