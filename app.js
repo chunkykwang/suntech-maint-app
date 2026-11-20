@@ -50,10 +50,21 @@
     }).catch(function () {});
     if (!navigator.onLine || !Api.ready()) return;
     var go = function () {
-      call('repair.init').then(function (d) {
+      $('lnote').textContent = 'กำลังโหลดรายชื่อช่าง…';
+      call('repair.init', {}, 30000).then(function (d) {
         Store.set('repair.init', d).catch(function () {});
         USERS = (d && d.techs) || []; fillUsers();
-      }, function () {});
+      }, function (er) {
+        // แสดงสาเหตุ + แตะเพื่อลองใหม่ (เดิมเงียบ ทำให้ดูเหมือนไม่มีรายชื่อ)
+        if (!USERS.length) {
+          $('lnote').innerHTML = '';
+          var t = document.createElement('span');
+          t.textContent = 'โหลดรายชื่อช่างไม่ได้: ' + (er && er.message || er) + ' ';
+          var b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = 'ลองใหม่';
+          b.onclick = loadUsers;
+          $('lnote').appendChild(t); $('lnote').appendChild(b);
+        }
+      });
     };
     if (!Api.pin()) askPin().then(go); else go();
   }
