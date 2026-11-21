@@ -36,6 +36,29 @@ header h1{font-size:18px;line-height:1.3}
 .vd.ok{background:var(--ok-bg);color:var(--ok)}.vd.bad{background:#fde8e6;color:#b42318}.vd.warn{background:var(--warn-bg);color:var(--warn)}
 .warnt{color:var(--warn)}
 .subh{font-size:16px;margin:20px 2px 8px}
+#r-form .actions{margin-top:4px}
+.search{width:100%;min-height:46px;padding:0 12px;margin-bottom:6px}
+.vt .btn.sm{margin-left:auto}
+.vt h2{flex:1}
+.item.rowbtn .st.ok{background:var(--ok-bg);color:var(--ok)}
+.item.rowbtn .st.bad{background:#fde8e6;color:#b42318}
+.item.rowbtn .st:not(.ok):not(.bad){background:var(--warn-bg);color:var(--warn)}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:8px}
+.dph{margin:0}.dph figcaption{font-size:13px;font-weight:700;margin-bottom:4px}
+.dimg{aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:var(--chip);display:grid;place-items:center;font-size:12px;color:var(--mu);border:1px solid var(--ln)}
+.dimg img{width:100%;height:100%;object-fit:cover;cursor:zoom-in}
+.dtx{font-size:15px;margin:4px 0 8px;white-space:pre-wrap;overflow-wrap:anywhere}.dtx span{display:block;font-size:12px;color:var(--mu)}
+.card .vd{margin:0 0 12px}
+.pdfbar{border-top:1px solid var(--ln);padding-top:12px;margin-top:4px}
+.pdfbtns{display:flex;gap:10px;flex-wrap:wrap}.pdfbtns .btn{flex:1 1 200px}
+.printhead{display:none}
+@media print{
+  header,.noprint,.toast,#lb{display:none!important}
+  body{background:#fff;color:#000}main{padding:0;max-width:none}
+  .printhead{display:block;font-size:18px;font-weight:700;margin-bottom:8px}
+  .card{break-inside:avoid;border-color:#bbb}
+  .dgrid{grid-template-columns:repeat(3,1fr)}
+}
 #lb{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:90;display:grid;place-items:center;padding:12px;cursor:zoom-out}
 #lb img{max-width:100%;max-height:100%;border-radius:8px}
 .actions{position:sticky;bottom:0;background:var(--bg);padding:10px 2px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--ln);z-index:5}

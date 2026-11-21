@@ -9,8 +9,8 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="repair.css?v=20261121b">
-<link rel="stylesheet" href="overhaul.css?v=20261121b">
+<link rel="stylesheet" href="repair.css?v=20261121c">
+<link rel="stylesheet" href="overhaul.css?v=20261121c">
 </head>
 <body>
 <header>
@@ -35,8 +35,16 @@
   </section>
 
   <section id="v-report" hidden>
-    <div class="draftbar"><span>ใบ <b id="rid"></b> · <span id="prog"></span></span><small>บันทึกในเครื่องอัตโนมัติ กรอกต่อทีหลังได้</small></div>
+    <div id="r-menu">
+      <div class="tiles">
+        <button type="button" class="tile" data-sub="form"><span class="ti">&#128221;</span><b>Blank report form</b><small id="mForm"></small></button>
+        <button type="button" class="tile" data-sub="hist"><span class="ti">&#128193;</span><b>ประวัติการทำ Overhaul</b><small id="mHist"></small></button>
+      </div>
+    </div>
 
+    <div id="r-form" hidden>
+    <div class="vt"><button type="button" class="link" data-sub="menu">&#8592; เมนู</button><h2>Blank report form</h2></div>
+    <div class="draftbar"><span>ใบ <b id="rid"></b> · <span id="prog"></span></span><small>บันทึกในเครื่องอัตโนมัติ กรอกต่อทีหลังได้</small></div>
     <section class="card" id="sec1">
       <h2><span class="n">1</span>ข้อมูล pump</h2>
       <div class="row">
@@ -56,7 +64,26 @@
       <button type="button" class="btn pri" id="bSubmit">ส่ง report</button>
     </div>
 
-    <div id="sentBox" hidden><h3 class="subh">Report ในเครื่องนี้</h3><div id="sent"></div></div>
+    </div>
+
+    <div id="r-hist" hidden>
+      <div class="vt"><button type="button" class="link" data-sub="menu">&#8592; เมนู</button><h2>ประวัติการทำ Overhaul</h2>
+        <button type="button" class="btn sm" id="bHistReload">โหลดใหม่</button></div>
+      <input class="search" id="hq" type="search" placeholder="ค้นหา S/N / Report ID / ชื่อช่าง" aria-label="ค้นหา">
+      <p class="note" id="histInfo"></p>
+      <div id="hist"></div>
+    </div>
+
+    <div id="r-detail" hidden>
+      <div class="vt noprint"><button type="button" class="link" data-sub="hist">&#8592; ประวัติ</button><h2>รายละเอียด report</h2></div>
+      <div class="printhead">Report : Overhaul Vacuum pump KRF15A</div>
+      <div id="detail"></div>
+      <div class="pdfbar noprint">
+        <p class="note" id="pdfNote"></p>
+        <div class="pdfbtns"><button type="button" class="btn pri" id="bPdf">Export PDF</button><button type="button" class="btn" id="bPrint">พิมพ์ / บันทึกจากเบราว์เซอร์</button></div>
+        <a id="pdfLink" class="note" target="_blank" rel="noopener" hidden>เปิดไฟล์ PDF ใน Drive</a>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -75,11 +102,11 @@
   </form>
 </div>
 
-<script src="session.js?v=20261121b"></script>
-<script src="config.js?v=20261121b"></script>
-<script src="store.js?v=20261121b"></script>
-<script src="api.js?v=20261121b"></script>
-<script src="overhaul.js?v=20261121b"></script>
+<script src="session.js?v=20261121c"></script>
+<script src="config.js?v=20261121c"></script>
+<script src="store.js?v=20261121c"></script>
+<script src="api.js?v=20261121c"></script>
+<script src="overhaul.js?v=20261121c"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>

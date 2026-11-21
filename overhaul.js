@@ -36,7 +36,7 @@
   }); });
   var PHOTO_LABEL = {};
 
-  var INIT = null, D = null, OUTBOX = [], SENT = [], syncing = false, CUR_SLOT = '';
+  var INIT = null, D = null, OUTBOX = [], HIST = { rows: [], at: '' }, syncing = false, CUR_SLOT = '', SUB = 'menu', DET = null, histLoading = false;
 
   /* ---------- เน็ต / PIN ---------- */
   function paint() {
@@ -75,7 +75,24 @@
     TAB = t; try { localStorage.setItem('oh_tab', t); } catch (_) {}
     document.querySelectorAll('.tabs button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === t)); });
     $('v-guide').hidden = t !== 'guide'; $('v-report').hidden = t !== 'report';
+    if (t === 'report') sub(SUB === 'detail' && !DET ? 'menu' : SUB); else window.scrollTo(0, 0);
+  }
+
+  /* ---------- เมนูย่อยของ report: menu / form / hist / detail ---------- */
+  function sub(v) {
+    SUB = v;
+    ['menu', 'form', 'hist', 'detail'].forEach(function (k) { $('r-' + k).hidden = k !== v; });
+    if (v === 'menu') paintMenu();
+    if (v === 'hist') { renderHist(); loadHist(); }
+    if (v === 'detail') renderDetail();
     window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('[data-sub]').forEach(function (b) { b.onclick = function () { sub(b.dataset.sub); }; });
+  function paintMenu() {
+    var got = D ? PHOTO_KEYS.filter(function (k) { return D.photos[k]; }).length : 0;
+    $('mForm').textContent = D && (D.sn || got || Object.keys(D.vals).length) ? 'มีใบที่กรอกค้าง: ' + D.id + (D.sn ? ' · S/N ' + D.sn : '') : 'เริ่มใบใหม่ · กรอกค้างไว้ได้';
+    var n = HIST.rows.length + OUTBOX.length;
+    $('mHist').textContent = n ? n + ' ใบ' + (OUTBOX.length ? ' (รอส่ง ' + OUTBOX.length + ')' : '') : 'งานที่ส่งแล้ว · ดูรายละเอียด · Export PDF';
   }
   document.querySelectorAll('.tabs button').forEach(function (b) { b.onclick = function () { tab(b.dataset.tab); }; });
 
@@ -257,7 +274,7 @@
     Store.set('overhaul.outbox', OUTBOX).then(function () {
       D = newDraft(); return Store.set('overhaul.draft', D);
     }).then(function () {
-      fillLists(); fillValues(); paint(); renderSent(); window.scrollTo(0, 0);
+      fillLists(); fillValues(); paint(); sub('hist');
       toast(navigator.onLine ? 'กำลังส่ง ' + r.id + '…' : 'เก็บ ' + r.id + ' ไว้ในเครื่อง จะส่งเมื่อมีเน็ต');
       sync(true);
     });
@@ -274,10 +291,10 @@
       var r = OUTBOX[0];
       call('overhaul.submit', { payload: r }, 180000).then(function (res) {
         OUTBOX = OUTBOX.filter(function (x) { return x.submitId !== r.submitId; });
-        SENT.unshift({ id: r.id, sn: r.sn, tech: r.tech, date: r.date, at: r.sub, result: res.result || '', kpa: r.vals.kpa || '' });
-        SENT = SENT.slice(0, 20);
-        return Promise.all([Store.set('overhaul.outbox', OUTBOX), Store.set('overhaul.sent', SENT)]).then(function () {
-          syncing = false; paint(); renderSent();
+        return Store.set('overhaul.outbox', OUTBOX).then(function () {
+          syncing = false; paint();
+          if (DET && DET.local && DET.submitId === r.submitId) { DET = null; if (SUB === 'detail') sub('hist'); }
+          loadHist(true);
           toast(res.duplicate ? r.id + ' ส่งไปแล้วก่อนหน้า' : 'ส่ง ' + r.id + ' แล้ว' + (res.result ? ' · ' + res.result : ''));
           if (OUTBOX.length) sync();
         });
@@ -288,14 +305,120 @@
     };
     if (!Api.pin()) askPin().then(go); else go();
   }
-  function renderSent() {
-    var rows = OUTBOX.map(function (r) { return { id: r.id, sn: r.sn, date: r.date, wait: true }; }).concat(SENT);
-    $('sentBox').hidden = !rows.length;
-    $('sent').innerHTML = rows.map(function (r) {
-      return '<div class="item' + (r.wait ? ' wait' : '') + '"><div class="top"><b>' + esc(r.id) + '</b><span class="st">' + (r.wait ? 'รอส่ง' : 'ส่งแล้ว') + '</span></div>' +
-        '<div class="meta">S/N ' + esc(r.sn) + ' · ' + esc(r.date) + (r.kpa ? ' · ' + esc(r.kpa) + ' kPa' : '') + (r.result ? ' · ' + esc(r.result) : '') + '</div></div>';
-    }).join('');
+  /* ---------- ประวัติ ---------- */
+  function loadHist(force) {
+    if (histLoading || !navigator.onLine || !Api.ready()) { if (SUB === 'hist') renderHist(); return; }
+    histLoading = true; if (SUB === 'hist') renderHist();
+    var go = function () {
+      call('overhaul.list', {}, 60000).then(function (d) {
+        histLoading = false; HIST = d || { rows: [], at: '' }; Store.set('overhaul.list', HIST).catch(function () {});
+        if (SUB === 'hist') renderHist(); if (SUB === 'menu') paintMenu();
+      }, function (er) { histLoading = false; if (SUB === 'hist') { renderHist(); toast('โหลดประวัติไม่ได้: ' + er.message); } });
+    };
+    if (!Api.pin()) askPin().then(go); else go();
   }
+  function allRows() {
+    var local = OUTBOX.map(function (r) { return { id: r.id, sn: r.sn, tech: r.tech, date: r.date, sub: r.sub, vals: r.vals, photos: r.photos, local: true, submitId: r.submitId }; });
+    return local.concat(HIST.rows || []);
+  }
+  function resCls(t) { return /^Pass/.test(t || '') ? 'ok' : /^Fail/.test(t || '') ? 'bad' : ''; }
+  function renderHist() {
+    var q = ($('hq').value || '').trim().toUpperCase();
+    var rows = allRows().filter(function (r) { return !q || (r.sn + ' ' + r.id + ' ' + r.tech).toUpperCase().indexOf(q) >= 0; });
+    $('histInfo').textContent = histLoading ? 'กำลังโหลด…' : HIST.at ? 'ข้อมูล ณ ' + HIST.at + (navigator.onLine ? '' : ' (ออฟไลน์)') : (navigator.onLine ? '' : 'ยังไม่มีข้อมูลในเครื่อง — เปิดตอนมีเน็ต 1 ครั้ง');
+    $('hist').innerHTML = rows.length ? rows.map(function (r, i) {
+      var res = r.local ? 'รอส่ง' : (r.result || '-');
+      return '<button type="button" class="item rowbtn' + (r.local ? ' wait' : '') + '" data-i="' + i + '"><div class="top"><b>S/N ' + esc(r.sn) + '</b>' +
+        '<span class="st ' + (r.local ? '' : resCls(r.result)) + '">' + esc(res.replace(/ \(.*/, '')) + '</span></div>' +
+        '<div class="meta">' + esc(r.id) + ' · ' + esc(r.date) + ' · ' + esc(r.tech) + (r.vals && r.vals.kpa ? ' · ' + esc(r.vals.kpa) + ' kPa' : '') + '</div></button>';
+    }).join('') : '<div class="empty">' + (histLoading ? 'กำลังโหลด…' : 'ยังไม่มี report') + '</div>';
+    $('hist').querySelectorAll('[data-i]').forEach(function (b) { b.onclick = function () { DET = rows[+b.dataset.i]; sub('detail'); }; });
+  }
+  $('hq').addEventListener('input', renderHist);
+  $('bHistReload').onclick = function () { if (!navigator.onLine) return toast('ไม่มีเน็ต — แสดงข้อมูลที่เก็บในเครื่อง'); loadHist(true); };
+
+  /* ---------- รายละเอียด ---------- */
+  function photoSrc(r, key) { return r.local ? r.photos[key] || '' : ''; }
+  function dPhoto(r, key, cap) {
+    var has = r.local ? !!r.photos[key] : !!r.photos[key];
+    return '<figure class="dph"><figcaption>' + esc(cap) + '</figcaption>' + (has
+      ? '<div class="dimg" data-pk="' + key + '">' + (photoSrc(r, key) ? '<img src="' + photoSrc(r, key) + '" alt="' + esc(cap) + '">' : '<span>กำลังโหลดรูป…</span>') + '</div>'
+      : '<div class="dimg none"><span>ไม่มีรูป</span></div>') + '</figure>';
+  }
+  function dText(label, v) { return '<div class="dtx"><span>' + esc(label) + '</span>' + esc(v || '-') + '</div>'; }
+  function renderDetail() {
+    var r = DET; if (!r) return;
+    var v = r.vals || {};
+    var h = '<section class="card"><h2>S/N ' + esc(r.sn) + '</h2>' +
+      '<div class="info"><div><span>Report ID</span><b>' + esc(r.id) + '</b></div><div><span>ช่าง</span><b>' + esc(r.tech) + '</b></div>' +
+      '<div><span>วันที่</span><b>' + esc(r.date) + '</b></div><div><span>ส่งเมื่อ</span><b>' + esc(r.local ? 'ยังไม่ส่ง (รอเน็ต)' : r.sub) + '</b></div></div>' +
+      (r.result ? '<div class="vd ' + resCls(r.result) + '">ผล: ' + esc(r.result) + '</div>' : '') +
+      '<div class="dgrid">' + dPhoto(r, 'plate', 'รูป plate') + '</div></section>';
+    SECTIONS.forEach(function (s) {
+      h += '<section class="card"><h2>' + esc(s.t) + '</h2>';
+      if (s.items[0].kind === 'p1') { h += '<div class="dgrid">' + s.items.map(function (it) { return dPhoto(r, it.k, it.label); }).join('') + '</div></section>'; return; }
+      s.items.forEach(function (it) {
+        h += '<div class="part"><h3>' + esc(it.label) + '</h3><div class="dgrid">';
+        if (it.kind === 'bac') h += dPhoto(r, it.k + '_b', 'ก่อน') + dPhoto(r, it.k + '_a', 'หลัง');
+        else h += dPhoto(r, it.k + '_p', 'รูปสภาพ');
+        h += '</div>';
+        if (it.kind === 'ptc') h += dText('ความหนา', v[it.k + '_t'] ? v[it.k + '_t'] + ' mm' : '');
+        if (it.kind !== 'p') h += dText('Comment', v[it.k + '_c']);
+        h += '</div>';
+      });
+      h += '</section>';
+    });
+    h += '<section class="card"><h2>ทดสอบหลัง overhaul</h2>' +
+      dText('Blank-off vacuum', v.kpa ? v.kpa + ' kPa' : '') + dText('กระแส L1 / L2 / L3', [v.a1, v.a2, v.a3].some(Boolean) ? [v.a1, v.a2, v.a3].map(function (x) { return x || '-'; }).join(' / ') + ' A' : '') +
+      dText('เสียง', v.noise) + dText('อุณหภูมิ', v.temp ? v.temp + ' °C' : '') + dText('หมายเหตุ', v.note) + '</section>';
+    $('detail').innerHTML = h;
+    $('bPdf').disabled = !!r.local;
+    $('pdfNote').textContent = r.local ? 'report นี้ยังไม่ได้ส่ง — ส่งเข้าระบบก่อนจึง export PDF ได้ (ใช้ปุ่มพิมพ์ได้)' : 'สร้าง PDF จากข้อมูลในระบบ (ต้องมีเน็ต) และเก็บสำเนาไว้ใน Drive';
+    $('pdfLink').hidden = true;
+    $('detail').querySelectorAll('.dimg img').forEach(function (im) { im.onclick = function () { $('lbImg').src = im.src; $('lb').hidden = false; }; });
+    if (!r.local) loadDetailPhotos(r);
+  }
+  function loadDetailPhotos(r) {
+    var keys = Object.keys(r.photos || {}), i = 0;
+    function put(key, d) {
+      var box = $('detail').querySelector('[data-pk="' + key + '"]'); if (!box || DET !== r) return;
+      box.innerHTML = d ? '<img src="' + d + '" alt="">' : '<span>' + (navigator.onLine ? 'โหลดรูปไม่ได้' : 'รูปยังไม่ได้โหลด (ต้องมีเน็ต)') + '</span>';
+      var im = box.querySelector('img'); if (im) im.onclick = function () { $('lbImg').src = d; $('lb').hidden = false; };
+    }
+    function next() {
+      if (i >= keys.length || DET !== r) return;
+      var key = keys[i++], id = r.photos[key];
+      Store.get('oh.photo:' + id).then(function (d) {
+        if (d) { put(key, d); return next(); }
+        if (!navigator.onLine || !Api.pin()) { put(key, ''); return next(); }
+        call('overhaul.photo', { id: id }, 60000).then(function (x) { Store.set('oh.photo:' + id, x.data).catch(function () {}); put(key, x.data); next(); },
+          function () { put(key, ''); next(); });
+      });
+    }
+    next(); next();                                       // โหลดพร้อมกัน 2 รูป
+  }
+  $('bPdf').onclick = function () {
+    var r = DET; if (!r || r.local) return;
+    if (!navigator.onLine) return toast('ต้องมีเน็ตเพื่อสร้าง PDF');
+    var b = $('bPdf'); b.disabled = true; b.textContent = 'กำลังสร้าง PDF…';
+    call('overhaul.pdf', { id: r.id }, 180000).then(function (x) {
+      b.disabled = false; b.textContent = 'Export PDF';
+      var bin = atob(x.data), u8 = new Uint8Array(bin.length);
+      for (var k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+      var blob = new Blob([u8], { type: 'application/pdf' });
+      if (x.url) { $('pdfLink').href = x.url; $('pdfLink').hidden = false; }
+      var file = null; try { file = new File([blob], x.name, { type: 'application/pdf' }); } catch (_) {}
+      if (file && navigator.canShare && navigator.canShare({ files: [file] }) && /iPhone|iPad|Android/i.test(navigator.userAgent)) {
+        navigator.share({ files: [file], title: x.name }).catch(function () {});
+      } else {
+        var a = document.createElement('a'), u = URL.createObjectURL(blob);
+        a.href = u; a.download = x.name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(u); }, 10000);
+      }
+      toast('สร้าง ' + x.name + ' แล้ว');
+    }, function (er) { b.disabled = false; b.textContent = 'Export PDF'; toast('สร้าง PDF ไม่ได้: ' + er.message); });
+  };
+  $('bPrint').onclick = function () { window.print(); };
 
   /* ---------- โหลด ---------- */
   function refresh() {
@@ -309,12 +432,12 @@
     if (!Api.pin()) askPin().then(go); else go();
   }
 
-  Promise.all([Store.get('overhaul.init'), Store.get('overhaul.draft'), Store.get('overhaul.outbox'), Store.get('overhaul.sent')]).then(function (r) {
-    INIT = r[0] || null; D = r[1] || newDraft(); OUTBOX = r[2] || []; SENT = r[3] || [];
+  Promise.all([Store.get('overhaul.init'), Store.get('overhaul.draft'), Store.get('overhaul.outbox'), Store.get('overhaul.list')]).then(function (r) {
+    INIT = r[0] || null; D = r[1] || newDraft(); OUTBOX = r[2] || []; HIST = r[3] || { rows: [], at: '' };
     D.vals = D.vals || {}; D.photos = D.photos || {};
-    buildForm(); fillLists(); fillValues(); renderGuide(); renderSent(); paint(); tab(TAB);
+    buildForm(); fillLists(); fillValues(); renderGuide(); paint(); tab(TAB);
     $('loading').hidden = true;
-    refresh(); sync();
+    refresh(); sync(); loadHist();
   }, function (er) {
     $('loading').hidden = true; $('guide').innerHTML = '<div class="errbox">เปิดที่เก็บข้อมูลในเครื่องไม่ได้: ' + esc(er && er.message) + '</div>';
   });
