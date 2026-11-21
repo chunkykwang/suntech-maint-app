@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Other</title>
+<meta name="theme-color" content="#0f2f2a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="repair.css?v=20261121b">
+<link rel="stylesheet" href="overhaul.css?v=20261121b">
+</head>
+<body>
+<header>
+  <a class="back" href="./">&#8592; เมนูหลัก</a>
+  <h1>Other</h1>
+  <div class="sync"><span id="net" class="pill" role="status" aria-live="polite">…</span></div>
+</header>
+<main>
+  <div class="tiles">
+    <a class="tile" href="overhaul.html"><span class="ti">&#9881;</span><b>Report : Overhaul Vacuum pump KRF15A</b><small>หน้าแนะนำ · ลง report พร้อมรูปและผล Blank-off · ใช้ได้ตอนไม่มีเน็ต</small></a>
+  </div>
+</main>
+<script src="session.js?v=20261121b"></script>
+<script>
+  Session.require();
+  (function () {
+    var n = document.getElementById('net');
+    function p() { n.textContent = navigator.onLine ? 'ออนไลน์' : 'ออฟไลน์'; n.classList.toggle('off', !navigator.onLine); }
+    addEventListener('online', p); addEventListener('offline', p); p();
+  })();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>

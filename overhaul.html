@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Overhaul KRF15A</title>
+<meta name="theme-color" content="#0f2f2a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="repair.css?v=20261121b">
+<link rel="stylesheet" href="overhaul.css?v=20261121b">
+</head>
+<body>
+<header>
+  <a class="back" href="other.html">&#8592; Other</a>
+  <h1>Report : Overhaul Vacuum pump KRF15A</h1>
+  <div class="sync">
+    <span id="net" class="pill" role="status" aria-live="polite">…</span>
+    <span id="pending" class="pill wait" hidden></span>
+    <button id="bSync" type="button" hidden>ส่งตอนนี้</button>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button type="button" role="tab" data-tab="guide" aria-selected="true">หน้าแนะนำ</button>
+    <button type="button" role="tab" data-tab="report" aria-selected="false">ลง report</button>
+  </nav>
+</header>
+
+<main>
+  <div id="loading" class="empty">กำลังโหลด…</div>
+
+  <section id="v-guide" hidden>
+    <div id="guide"></div>
+  </section>
+
+  <section id="v-report" hidden>
+    <div class="draftbar"><span>ใบ <b id="rid"></b> · <span id="prog"></span></span><small>บันทึกในเครื่องอัตโนมัติ กรอกต่อทีหลังได้</small></div>
+
+    <section class="card" id="sec1">
+      <h2><span class="n">1</span>ข้อมูล pump</h2>
+      <div class="row">
+        <div class="f"><label for="tech">ชื่อช่าง <span class="req">*</span></label><select id="tech"></select></div>
+        <div class="f"><label for="date">วันที่ <span class="req">*</span></label><input id="date" type="date"></div>
+      </div>
+      <div class="f"><label for="sn">Serial no. (series pump) <span class="req">*</span></label>
+        <input id="sn" list="snList" autocomplete="off" autocapitalize="characters" placeholder="พิมพ์หรือเลือก S/N"><datalist id="snList"></datalist>
+        <span id="snInfo" class="note"></span></div>
+      <div class="slots"><div class="slot" data-slot="plate"><div class="sl">รูป plate</div><div class="sp" id="sp_plate"></div></div></div>
+    </section>
+
+    <div id="sections"></div>
+
+    <div class="actions">
+      <button type="button" class="btn ghost" id="bClear">ล้างฟอร์ม</button>
+      <button type="button" class="btn pri" id="bSubmit">ส่ง report</button>
+    </div>
+
+    <div id="sentBox" hidden><h3 class="subh">Report ในเครื่องนี้</h3><div id="sent"></div></div>
+  </section>
+</main>
+
+<input id="fCam" type="file" accept="image/*" capture="environment" hidden>
+<input id="fGal" type="file" accept="image/*" hidden>
+<div id="lb" hidden><img id="lbImg" alt="รูปขยาย"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="pinwrap" id="pinWrap" hidden>
+  <form class="pinbox" id="pinForm">
+    <h2>ใส่ PIN ของเครื่อง</h2>
+    <p>ใส่ครั้งเดียว เครื่องจะจำไว้ (ขอ PIN จากหัวหน้างาน)</p>
+    <input id="pinIn" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN">
+    <div class="pinerr" id="pinErr" role="alert"></div>
+    <button class="btn pri" type="submit" id="pinOk">ตกลง</button>
+  </form>
+</div>
+
+<script src="session.js?v=20261121b"></script>
+<script src="config.js?v=20261121b"></script>
+<script src="store.js?v=20261121b"></script>
+<script src="api.js?v=20261121b"></script>
+<script src="overhaul.js?v=20261121b"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>

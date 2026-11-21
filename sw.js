@@ -5,7 +5,7 @@
  * ทำให้ไฟล์ HTML กับ JS เป็นเวอร์ชันเดียวกันเสมอ (เคยค้างเพราะหน้าใหม่ไปเจอ JS เก่าในเครื่อง)
  * (ข้อมูลจาก Google Sheets จะไม่ถูก cache ที่นี่ — จะเก็บใน IndexedDB ของแอปแทน)
  */
-const VERSION = 'v1.0.0-login.11';
+const VERSION = 'v1.0.0-overhaul.12';
 const CACHE = 'suntech-maint-' + VERSION;
 const SHELL = [
   './',
@@ -25,6 +25,10 @@ const SHELL = [
   './stock.html',
   './stock.css',
   './stock.js',
+  './other.html',
+  './overhaul.html',
+  './overhaul.css',
+  './overhaul.js',
   './config.js',
   './store.js',
   './api.js',
