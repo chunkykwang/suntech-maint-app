@@ -106,11 +106,31 @@
       var h = '<section class="card' + (g.warn ? ' gwarn' : '') + '"><h2>' + esc(g.h) + '</h2>';
       if (g.note) h += '<p class="gnote">' + esc(g.note) + '</p>';
       if (g.list) h += '<ul class="glist">' + g.list.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+      if (g.imgs) h += '<div class="gimgs">' + g.imgs.map(function (m) {
+        return '<figure class="gimg"><div class="gbox" data-gimg="' + esc(m.id) + '"><span>กำลังโหลดรูป…</span></div><figcaption>' + esc(m.cap) + '</figcaption></figure>';
+      }).join('') + '</div>';
       if (g.table) h += '<div class="gtbl">' + g.table.slice(1).map(function (r) {
-        return '<div class="gr"><b>' + esc(r[0]) + '</b><span>' + esc(r[1]) + '</span></div>';
+        return r[1] === '' ? '<div class="gr gsub"><b>' + esc(r[0]) + '</b></div>'
+          : '<div class="gr"><b>' + esc(r[0]) + '</b><span>' + esc(r[1]) + '</span></div>';
       }).join('') + '</div>';
       return h + '</section>';
     }).join('') + '<p class="note">อัปเดตข้อมูลล่าสุด ' + esc(INIT.at || '') + '</p>';
+    loadGuideImgs();
+  }
+  // รูปในหน้าแนะนำ: เก็บในเครื่อง ('oh.guide:'+id) ครั้งเดียว ดูออฟไลน์ได้
+  function loadGuideImgs() {
+    document.querySelectorAll('[data-gimg]').forEach(function (box) {
+      var id = box.dataset.gimg;
+      var put = function (d) {
+        box.innerHTML = d ? '<img src="' + d + '" alt="Exploded view">' : '<span>' + (navigator.onLine ? 'โหลดรูปไม่ได้' : 'รูปยังไม่ได้โหลด — เปิดตอนมีเน็ต 1 ครั้ง') + '</span>';
+        var im = box.querySelector('img'); if (im) im.onclick = function () { $('lbImg').src = d; $('lb').hidden = false; $('lb').classList.add('zoomable'); };
+      };
+      Store.get('oh.guide:' + id).then(function (d) {
+        if (d) return put(d);
+        if (!navigator.onLine || !Api.ready() || !Api.pin()) return put('');
+        call('overhaul.guideImg', { id: id }, 60000).then(function (x) { Store.set('oh.guide:' + id, x.data).catch(function () {}); put(x.data); }, function () { put(''); });
+      });
+    });
   }
 
   /* ---------- ฟอร์ม ---------- */
@@ -182,7 +202,12 @@
     if ((b = box.querySelector('[data-rx]'))) b.onclick = function () { if (confirm('ลบรูป "' + PHOTO_LABEL[key] + '" ?')) { delete D.photos[key]; paintSlot(key); save(); } };
     if ((b = box.querySelector('[data-zoom]'))) b.onclick = function () { $('lbImg').src = d; $('lb').hidden = false; };
   }
-  $('lb').onclick = function () { $('lb').hidden = true; $('lbImg').src = ''; };
+  // lightbox: รูปทั่วไปแตะเพื่อปิด / รูปแผนผังแตะครั้งแรกขยายเต็ม (เลื่อนดูได้) แตะอีกครั้งปิด
+  $('lb').onclick = function () {
+    var lb = $('lb');
+    if (lb.classList.contains('zoomable') && !lb.classList.contains('big')) { lb.classList.add('big'); return; }
+    lb.hidden = true; lb.classList.remove('zoomable', 'big'); $('lbImg').src = '';
+  };
   function paintNoise() {
     document.querySelectorAll('[data-noise]').forEach(function (b) { b.setAttribute('aria-checked', String(D.vals.noise === b.dataset.noise)); });
   }
