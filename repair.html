@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="repair.css?v=20261121d">
+<link rel="stylesheet" href="repair.css?v=20261124a">
 </head>
 <body>
 <header>
@@ -32,7 +32,7 @@
     <div class="tiles">
       <button type="button" class="tile" data-go="new"><span class="ti">&#128221;</span><b>ใบแจ้งซ่อมใหม่</b><small>กรอกเองทั้งใบ</small></button>
       <button type="button" class="tile" data-go="jobs"><span class="ti">&#9203;</span><b>งานรอปิด</b><small id="jobsSub">งานที่ admin จ่ายให้</small><span class="cnt" id="jobsCnt" hidden></span></button>
-      <button type="button" class="tile" data-go="list"><span class="ti">&#128228;</span><b>ใบแจ้งซ่อมที่ส่งแล้ว</b><small>ดูรายละเอียด · ข้อความ LINE</small></button>
+      <button type="button" class="tile" data-go="list"><span class="ti">&#128228;</span><b>ใบแจ้งซ่อมที่ส่งแล้ว</b><small>ทุกใบของทุกคน · กรองวันที่ / เครื่อง · ข้อความ LINE</small></button>
       <button type="button" class="tile adm" data-go="assign" id="tAssign" hidden><span class="ti">&#128203;</span><b>จ่ายงาน</b><small>เฉพาะ admin</small></button>
     </div>
   </section>
@@ -106,9 +106,35 @@
     <div class="vt"><button type="button" class="link" data-menu>&#8592; เมนู</button><h2>ใบแจ้งซ่อมที่ส่งแล้ว</h2></div>
     <div class="drive" data-drive></div>
     <p class="note" id="listNote"></p>
-    <div class="admbar" id="admBar" hidden><span id="admStat" role="status" aria-live="polite"></span><button type="button" class="btn ghost" id="bReload">โหลดใหม่</button></div>
-    <input id="q" type="search" class="search" placeholder="ค้นหา เลขที่ใบ / เครื่อง / ช่าง / อาการ / วันที่" aria-label="ค้นหาใบแจ้งซ่อม">
+    <div class="admbar" id="admBar"><span id="admStat" role="status" aria-live="polite"></span><button type="button" class="btn ghost" id="bReload">โหลดใหม่</button></div>
+    <div class="filters">
+      <label>ตั้งแต่วันที่<input id="fFrom" type="date"></label>
+      <label>ถึงวันที่<input id="fTo" type="date"></label>
+      <label>Machine type<select id="fType"></select></label>
+      <label>หมายเลขเครื่อง<select id="fEq"></select></label>
+    </div>
+    <div class="fchips"><button type="button" class="chipb" data-range="7">7 วัน</button><button type="button" class="chipb" data-range="30">30 วัน</button>
+      <button type="button" class="chipb" data-range="90">3 เดือน</button><button type="button" class="chipb" data-range="365">1 ปี</button>
+      <button type="button" class="chipb" id="fClear">ล้างตัวกรอง</button><span id="fCount" class="note"></span></div>
+    <input id="q" type="search" class="search" placeholder="ค้นหา เลขที่ใบ / ช่าง / อาการ / Sector" aria-label="ค้นหาใบแจ้งซ่อม">
     <div id="list"></div>
+  </section>
+
+  <section id="v-share" hidden>
+    <div class="okbox" role="status" aria-live="polite"><p id="shStat"></p></div>
+    <section class="card"><h2>ข้อความสำหรับ LINE</h2>
+      <p class="note" id="shNote"></p>
+      <div class="lbox"><textarea id="shText" readonly aria-label="ข้อความสำหรับ LINE"></textarea></div>
+      <div class="acts shacts">
+        <button type="button" class="btn line" id="shShare">แชร์ไป LINE</button>
+        <button type="button" class="btn ghost" id="shCopy">คัดลอกข้อความ</button>
+      </div>
+    </section>
+    <div class="acts shnext">
+      <button type="button" class="btn ghost" id="shDetail">ดูรายละเอียดใบนี้</button>
+      <button type="button" class="btn ghost" id="shNew">+ ใบแจ้งซ่อมใหม่</button>
+      <button type="button" class="btn ghost" data-menu>กลับเมนู</button>
+    </div>
   </section>
 
   <section id="v-detail" hidden>
@@ -130,11 +156,11 @@
 <div class="toast" id="toast" role="status"></div>
 <div class="lightbox" id="lb" hidden><img id="lbImg" alt="รูปตัวอย่างหน้างาน"><button type="button" class="btn" id="lbX">ปิด</button></div>
 
-<script src="config.js?v=20261121d"></script>
-<script src="store.js?v=20261121d"></script>
-<script src="session.js?v=20261121d"></script>
-<script src="api.js?v=20261121d"></script>
-<script src="repair.js?v=20261121d"></script>
+<script src="config.js?v=20261124a"></script>
+<script src="store.js?v=20261124a"></script>
+<script src="session.js?v=20261124a"></script>
+<script src="api.js?v=20261124a"></script>
+<script src="repair.js?v=20261124a"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>

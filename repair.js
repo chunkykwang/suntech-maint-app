@@ -5,7 +5,8 @@
  * ใบแจ้งซ่อม/การจ่ายงาน เข้าคิว 'repair.outbox' แล้วส่งเองเมื่อมีเน็ต — ส่งซ้ำไม่บันทึกซ้ำ (submitId)
  * ใบที่ส่งแล้ว 30 ใบล่าสุดเก็บใน 'repair.sent' (ข้อมูลทั้งใบ + ข้อความ LINE + ลิงก์รูป)
  * ลิงก์ไฟล์ใน Drive มาจาก repair.init (sheetUrl) — ไม่ใส่ ID ไฟล์ไว้ใน repo
- * admin เห็นใบแจ้งซ่อมทุกใบ (ทุกคน ทุกเครื่อง) จาก action 'repair.list' เก็บในเครื่องที่ 'repair.all' ไว้ดูตอน offline
+ * ทุกคนเห็นใบแจ้งซ่อมทุกใบ (ทุกคน ทุกเครื่อง) จาก action 'repair.list' ตามช่วงวันที่ เก็บในเครื่องที่ 'repair.all' ไว้ดูตอน offline
+ * กดส่งรายงาน -> ไปหน้าแชร์ข้อความ LINE ก่อน (v-share)
  */
 (function () {
   'use strict';
@@ -14,7 +15,8 @@
   var OTHER = 'อื่นๆ (ระบุ)', ADMIN = Session.ADMIN;
   var M = null, OUTBOX = [], SENT = [], JOBS = [], photos = { p1: null, p2: null }, syncing = false;
   var USER = Session.user(), MODE = 'new', JOB = null, VIEW = '', DETAIL = null, LAST_ASSIGN = null, REFS = [];
-  var ALL = [], ALL_AT = '', ALL_ERR = '', ALL_LOADING = false;   // admin: ใบแจ้งซ่อมทุกใบจากเซิร์ฟเวอร์ (repair.list)
+  var ALL = [], ALL_AT = '', ALL_ERR = '', ALL_LOADING = false, ALL_RANGE = '';   // ใบแจ้งซ่อมทุกใบจากเซิร์ฟเวอร์ (repair.list)
+  var SHARE = null;   // submitId ของใบที่เพิ่งส่ง (หน้าแชร์)
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -66,7 +68,7 @@
   function boot() {
     Promise.all([Store.get('repair.init'), Store.get('repair.outbox'), Store.get('repair.sent'), Store.get('repair.jobs')]).then(function (r) {
       OUTBOX = r[1] || []; SENT = r[2] || []; JOBS = r[3] || [];
-      Store.get('repair.all').then(function (a) { if (a && a.rows) { ALL = a.rows; ALL_AT = a.at || ''; } }).catch(function () {});
+      Store.get('repair.all').then(function (a) { if (a && a.rows) { ALL = a.rows; ALL_AT = a.at || ''; ALL_RANGE = a.range || ''; } }).catch(function () {});
       if (r[0]) use(r[0]);
       paint();
       var go = function () { refresh(); sync(); };
@@ -342,7 +344,9 @@
       $('go').disabled = false;
       toast(msg + (navigator.onLine ? ' กำลังส่ง…' : ' — เก็บในเครื่อง จะส่งเมื่อมีเน็ต'));
       LAST_ASSIGN = item.kind === 'assign' ? item : null;
-      resetForm(); paint(); show(item.kind === 'assign' ? 'jobs' : 'list'); sync();
+      resetForm(); paint();
+      if (item.kind === 'assign') show('jobs'); else { SHARE = item.submitId; show('share'); }
+      sync();
     }, function (e) { OUTBOX.pop(); $('go').disabled = false; toast('บันทึกในเครื่องไม่ได้: ' + e.message); });
   });
   function resetForm() {
@@ -431,37 +435,73 @@
     r.hasP1 = !!L.p1; r.hasP2 = !!L.p2;
     return { submitId: r.submitId || r.id, id: r.id, eq: r.eq, at: r.sub, sent: true, rec: r, links: L, text: lineText(r, L), server: true };
   }
+  /* ตัวกรอง: วันที่ (ดึงจากเซิร์ฟเวอร์ตามช่วง) / Machine type / หมายเลขเครื่อง (กรองในเครื่อง) */
+  function addDays(n) { var d = new Date(); d.setDate(d.getDate() - n); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function rangeKey() { return ($('fFrom').value || '') + '~' + ($('fTo').value || ''); }
   function loadAll(force) {
-    if (!isAdmin() || ALL_LOADING) return;
-    if (!navigator.onLine) { ALL_ERR = 'ออฟไลน์ — แสดงข้อมูลที่โหลดไว้ล่าสุด'; if (VIEW === 'list') renderList(); return; }
-    if (!force && ALL_AT && Date.now() - ALL_AT.t < 60000) return;
+    if (ALL_LOADING) return;
+    var key = rangeKey();
+    if (!navigator.onLine) { ALL_ERR = ALL_RANGE && ALL_RANGE !== key ? 'ออฟไลน์ — ข้อมูลในเครื่องเป็นช่วง ' + ALL_RANGE.replace('~', ' ถึง ') : 'ออฟไลน์ — แสดงข้อมูลที่โหลดไว้ล่าสุด'; if (VIEW === 'list') renderList(); return; }
+    if (!force && ALL_AT && ALL_RANGE === key && Date.now() - ALL_AT.t < 60000) return;
     ALL_LOADING = true; if (VIEW === 'list') renderList();
-    call('repair.list', { adminPw: Session.adminPw(), limit: 300 }, 60000).then(function (rows) {
-      ALL = (rows || []).map(fromServer); ALL_AT = { t: Date.now(), s: stamp().d + ' ' + stamp().hm }; ALL_ERR = '';
-      Store.set('repair.all', { rows: ALL, at: ALL_AT }).catch(function () {});
+    call('repair.list', { from: $('fFrom').value, to: $('fTo').value, limit: 2000 }, 90000).then(function (rows) {
+      ALL = (rows || []).map(fromServer); ALL_AT = { t: Date.now(), s: stamp().d + ' ' + stamp().hm }; ALL_ERR = ''; ALL_RANGE = key;
+      Store.set('repair.all', { rows: ALL, at: ALL_AT, range: key }).catch(function () {});
     }, function (er) {
-      ALL_ERR = /action|ไม่รู้จัก|unknown/i.test(er.message || '') ? 'เซิร์ฟเวอร์ยังไม่รองรับการดูทุกใบ (repair.list) — ต้องเพิ่มโค้ดใน Apps Script'
-        : er.code === 'ADMIN' ? 'รหัส admin ใช้ไม่ได้ — ออกจากระบบแล้วเข้าเป็น admin ใหม่' : 'โหลดใบทั้งหมดไม่ได้: ' + er.message;
+      ALL_ERR = /action|ไม่รู้จัก|unknown/i.test(er.message || '') ? 'เซิร์ฟเวอร์ยังไม่รองรับการดูทุกใบ (repair.list) — วาง RepairJobPhoto.gs ตัวล่าสุดแล้ว New version'
+        : 'โหลดใบทั้งหมดไม่ได้: ' + er.message;
     }).then(function () { ALL_LOADING = false; if (VIEW === 'list') renderList(); if (VIEW === 'detail') renderDetail(); });
   }
   function listItems() {
-    if (!isAdmin()) return SENT;
     var seen = {}, out = [];
     SENT.forEach(function (s) { if (!s.sent) { out.push(s); seen[s.submitId] = 1; seen[s.id] = 1; } });   // รอส่งจากเครื่องนี้ ขึ้นก่อน
     ALL.forEach(function (s) { if (!seen[s.submitId] && !seen[s.id]) { out.push(s); seen[s.submitId] = 1; seen[s.id] = 1; } });
     SENT.forEach(function (s) { if (!seen[s.submitId] && !seen[s.id]) out.push(s); });                     // จ่ายงาน / ใบที่ยังไม่อยู่ในรายการเซิร์ฟเวอร์
     return out;
   }
+  function fillFilters(L) {
+    var t = $('fType'), e = $('fEq'), tv = t.value, ev = e.value;
+    var types = uniq(L.map(function (s) { return (s.rec || {}).type; }).concat(M ? M.machines.map(function (m) { return m.type; }) : [])).sort();
+    t.innerHTML = opt('', 'ทั้งหมด') + types.map(function (x) { return opt(x); }).join(''); t.value = types.indexOf(tv) >= 0 ? tv : '';
+    var eqs = uniq(L.filter(function (s) { return !t.value || (s.rec || {}).type === t.value; }).map(function (s) { return s.eq; })
+      .concat(M ? M.machines.filter(function (m) { return !t.value || m.type === t.value; }).map(function (m) { return m.eq; }) : [])).sort();
+    e.innerHTML = opt('', 'ทั้งหมด') + eqs.map(function (x) { return opt(x); }).join(''); e.value = eqs.indexOf(ev) >= 0 ? ev : '';
+  }
+  function paintRangeChips() {
+    var f = $('fFrom').value, t = $('fTo').value;
+    document.querySelectorAll('[data-range]').forEach(function (b) { b.setAttribute('aria-pressed', String(t === today() && f === addDays(+b.dataset.range))); });
+  }
+  function saveFilters() { ls('rep_f', JSON.stringify({ from: $('fFrom').value, to: $('fTo').value, type: $('fType').value, eq: $('fEq').value })); }
+  (function initFilters() {
+    var f = {}; try { f = JSON.parse(ls('rep_f') || '{}'); } catch (_) {}
+    $('fFrom').value = f.from != null ? f.from : addDays(30); $('fTo').value = f.to != null ? f.to : '';
+    $('fType').innerHTML = opt(f.type || '', f.type || 'ทั้งหมด'); $('fEq').innerHTML = opt(f.eq || '', f.eq || 'ทั้งหมด');
+    var dt;
+    ['fFrom', 'fTo'].forEach(function (id) { $(id).addEventListener('change', function () { saveFilters(); renderList(); clearTimeout(dt); dt = setTimeout(function () { loadAll(true); }, 400); }); });
+    $('fType').addEventListener('change', function () { $('fEq').value = ''; saveFilters(); renderList(); });
+    $('fEq').addEventListener('change', function () { saveFilters(); renderList(); });
+    document.querySelectorAll('[data-range]').forEach(function (b) { b.onclick = function () { $('fFrom').value = addDays(+b.dataset.range); $('fTo').value = ''; saveFilters(); renderList(); loadAll(true); }; });
+    $('fClear').onclick = function () { $('fFrom').value = addDays(30); $('fTo').value = ''; $('fType').value = ''; $('fEq').value = ''; $('q').value = ''; saveFilters(); renderList(); loadAll(true); };
+  })();
+  function itemDate(s) { var r = s.rec || {}; return r.date || String(s.at || '').slice(0, 10); }
   function renderList() {
-    var box = $('list'), adm = isAdmin();
-    $('listNote').textContent = adm ? 'admin: ใบแจ้งซ่อมทุกใบของทุกคน (300 ใบล่าสุด) · แตะที่ใบเพื่อดูรายละเอียดและคัดลอกข้อความ LINE'
-      : 'ใบที่ทำจากเครื่องนี้ 30 ใบล่าสุด · แตะที่ใบเพื่อดูรายละเอียดและคัดลอกข้อความ LINE';
-    $('admBar').hidden = !adm;
-    if (adm) $('admStat').textContent = ALL_LOADING ? 'กำลังโหลดใบทั้งหมด…' : ALL_ERR ? ALL_ERR : ALL_AT ? 'อัปเดตล่าสุด ' + ALL_AT.s + ' · ' + ALL.length + ' ใบ' : '';
+    var box = $('list');
+    $('listNote').textContent = 'ใบแจ้งซ่อมทุกใบของทุกคน · แตะที่ใบเพื่อดูรายละเอียดและแชร์ข้อความ LINE';
+    $('admStat').textContent = ALL_LOADING ? 'กำลังโหลดใบแจ้งซ่อม…' : ALL_ERR ? ALL_ERR : ALL_AT ? 'อัปเดตล่าสุด ' + ALL_AT.s : '';
     var q = ($('q').value || '').trim().toLowerCase(), L = listItems();
-    var F = !q ? L : L.filter(function (s) { var r = s.rec || {}; return [s.id, s.eq, r.tech, r.desc, r.pb, r.date, r.sec, r.jobId].join(' ').toLowerCase().indexOf(q) >= 0; });
-    if (!L.length) { box.innerHTML = '<div class="empty">' + (adm && ALL_LOADING ? 'กำลังโหลด…' : 'ยังไม่มีใบแจ้งซ่อม') + '</div>'; return; }
-    if (!F.length) { box.innerHTML = '<div class="empty">ไม่พบใบที่ตรงกับ “' + esc(q) + '”</div>'; return; }
+    fillFilters(L); paintRangeChips();
+    var fr = $('fFrom').value, to = $('fTo').value, ty = $('fType').value, eq = $('fEq').value;
+    var F = L.filter(function (s) {
+      var r = s.rec || {}, d = itemDate(s);
+      if (fr && d && d < fr) return false;
+      if (to && d && d > to) return false;
+      if (ty && r.type !== ty) return false;
+      if (eq && s.eq !== eq) return false;
+      return !q || [s.id, s.eq, r.tech, r.desc, r.pb, r.date, r.sec, r.cause, r.jobId].join(' ').toLowerCase().indexOf(q) >= 0;
+    });
+    $('fCount').textContent = F.length + ' ใบ';
+    if (!L.length) { box.innerHTML = '<div class="empty">' + (ALL_LOADING ? 'กำลังโหลด…' : 'ยังไม่มีใบแจ้งซ่อมในช่วงนี้') + '</div>'; return; }
+    if (!F.length) { box.innerHTML = '<div class="empty">' + (ALL_LOADING ? 'กำลังโหลด…' : 'ไม่พบใบที่ตรงกับตัวกรอง') + '</div>'; return; }
     box.innerHTML = F.map(function (s) {
       var wait = !s.sent, r = s.rec || {}, asg = r.kind === 'assign';
       return '<button type="button" class="item rowbtn' + (wait ? ' wait' : '') + '" data-open="' + esc(s.submitId) + '">' +
@@ -545,9 +585,9 @@
       }).then(function () {
         if (assign && !JOBS.some(function (j) { return j.jobId === r.jobId; })) JOBS.push({ jobId: r.jobId, at: r.at, by: r.by, tech: r.tech, date: r.date, t1: r.t1, type: r.type, eq: r.eq, desc: r.desc, pb: r.pb, localRefs: r.refs || [] });
         if (!assign && r.jobId) JOBS = JOBS.filter(function (j) { return j.jobId !== r.jobId; });
-        if (!assign && isAdmin()) { ALL_AT = ''; if (VIEW === 'list' || VIEW === 'detail') setTimeout(function () { loadAll(true); }, 0); }
+        if (!assign) { ALL_AT = ''; if (VIEW === 'list' || VIEW === 'detail') setTimeout(function () { loadAll(true); }, 0); }
         Store.set('repair.jobs', JOBS);
-        syncing = false; paint(); if (VIEW === 'list') renderList(); if (VIEW === 'detail') renderDetail(); if (VIEW === 'jobs') renderJobs();
+        syncing = false; paint(); if (VIEW === 'list') renderList(); if (VIEW === 'detail') renderDetail(); if (VIEW === 'jobs') renderJobs(); if (VIEW === 'share') renderShare();
         var id = assign ? r.jobId : r.id;
         toast(res.duplicate ? id + ' ส่งไปแล้วก่อนหน้า' : assign ? 'ส่งงาน ' + id + ' ให้ ' + r.tech + ' แล้ว' : 'ส่ง ' + id + ' เข้า Drive แล้ว');
         if (OUTBOX.length) sync();
@@ -564,6 +604,25 @@
     });
   }
 
+  /* ---------- หน้าแชร์หลังกดส่ง ---------- */
+  function copyText(t, ta) {
+    (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('คัดลอกแล้ว วางใน LINE ได้เลย'); },
+      function () { ta.focus(); ta.select(); try { document.execCommand('copy'); toast('คัดลอกแล้ว วางใน LINE ได้เลย'); } catch (_) { toast('กดค้างที่ข้อความแล้วเลือกคัดลอก'); } });
+  }
+  function renderShare() {
+    var s = SENT.filter(function (x) { return x.submitId === SHARE; })[0];
+    if (!s) { show('list'); return; }
+    var r = s.rec || {}, hasPic = r.hasP1 || r.hasP2;
+    $('shStat').innerHTML = '<b>' + esc(s.id) + '</b> — ' + (s.sent ? 'ส่งเข้าระบบแล้ว' : navigator.onLine ? 'กำลังส่งเข้าระบบ…' : 'เก็บในเครื่องแล้ว จะส่งเองเมื่อมีเน็ต');
+    $('shNote').textContent = hasPic && !s.sent ? 'ลิงก์รูปจะขึ้นในข้อความหลังส่งเข้าระบบเสร็จ — ถ้าต้องการลิงก์รูป รอสักครู่ก่อนแชร์' : 'กดแชร์ไป LINE หรือคัดลอกไปวางในกลุ่ม';
+    var ta = $('shText'); ta.value = s.text; ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + 4) + 'px';
+    $('shShare').hidden = !navigator.share;
+    $('shShare').onclick = function () { navigator.share({ text: s.text }).catch(function () {}); };
+    $('shCopy').onclick = function () { copyText(s.text, ta); };
+    $('shDetail').onclick = function () { DETAIL = s.submitId; show('detail'); };
+  }
+  $('shNew').onclick = function () { openForm('new'); };
+
   /* ---------- views ---------- */
   $('bNewJob').onclick = function () { LAST_ASSIGN = null; openForm('assign'); };
   $('bAgain').onclick = function () { LAST_ASSIGN = null; openForm('assign'); };
@@ -573,9 +632,10 @@
     if (v !== 'jobs') LAST_ASSIGN = null;
     VIEW = v;
     $('v-menu').hidden = v !== 'menu';
-    $('frm').hidden = v !== 'form'; $('v-list').hidden = v !== 'list'; $('v-jobs').hidden = v !== 'jobs'; $('v-detail').hidden = v !== 'detail';
+    $('frm').hidden = v !== 'form'; $('v-list').hidden = v !== 'list'; $('v-jobs').hidden = v !== 'jobs'; $('v-detail').hidden = v !== 'detail'; $('v-share').hidden = v !== 'share';
     if (v === 'list') { renderList(); loadAll(); }
     if (v === 'detail') renderDetail();
+    if (v === 'share') renderShare();
     if (v === 'jobs') { renderJobs(); refreshJobs(); }
     paint();
     window.scrollTo(0, 0);
