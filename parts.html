@@ -9,8 +9,8 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="stock.css?v=20261124a">
-<link rel="stylesheet" href="parts.css?v=20261124a">
+<link rel="stylesheet" href="stock.css?v=20261124b">
+<link rel="stylesheet" href="parts.css?v=20261124b">
 </head>
 <body>
 <header>
@@ -54,10 +54,12 @@
     <div class="vt"><button type="button" class="link" data-home>&#8592; เมนู</button><h2>Part registration</h2>
       <button type="button" class="btn sm" id="bRegReload">โหลดใหม่</button></div>
     <div class="seg" role="tablist">
-      <button role="tab" data-mode="new" aria-selected="true">Part ใหม่ <span id="n_new"></span></button>
-      <button role="tab" data-mode="edit" aria-selected="false">แก้ part เดิม <span id="n_edit"></span></button>
+      <button role="tab" data-mode="nag" aria-selected="true">N/A กลุ่ม <span id="n_nag"></span></button>
+      <button role="tab" data-mode="sna" aria-selected="false">GG เสนอ N/A <span id="n_sna"></span></button>
       <button role="tab" data-mode="quick" aria-selected="false">ยืนยันเร็ว <span id="n_quick"></span></button>
-      <button role="tab" data-mode="na" aria-selected="false">N/A <span id="n_na"></span></button>
+      <button role="tab" data-mode="merge" aria-selected="false">Merge <span id="n_merge"></span></button>
+      <button role="tab" data-mode="new" aria-selected="false">Part ใหม่ <span id="n_new"></span></button>
+      <button role="tab" data-mode="edit" aria-selected="false">แก้ part เดิม <span id="n_edit"></span></button>
       <button role="tab" data-mode="inc" aria-selected="false">Incomplete <span id="n_inc"></span></button>
       <button role="tab" data-mode="all" aria-selected="false">Edit mode</button>
     </div>
@@ -104,7 +106,7 @@
       <label class="full">Description<input id="iDesc"></label>
       <datalist id="brandList"></datalist><datalist id="unitList"></datalist>
       <div class="fl">Category</div><div class="chips" id="cCat"></div>
-      <div class="fl">Manage type <span class="mu">(Control = นับ stock และบวกยอดรับเข้า · Uncontrol / N/A = บันทึกการรับอย่างเดียว · part ใหม่ได้เลข C0001 / U0001 / N0001 ตามแบบที่เลือก)</span></div><div class="chips" id="cMan"></div>
+      <div class="fl">Manage type <span class="mu">(Control = นับ stock และบวกยอดรับเข้า · Uncontrol / N/A = บันทึกการรับอย่างเดียว · part ใหม่ได้เลข C0001 / U0001 ตามแบบที่เลือก · N/A ไม่ออก Part ID)</span></div><div class="chips" id="cMan"></div>
       <div class="fl">Stock class</div><div class="chips" id="cCls"></div>
       <div class="fl">ใช้ในแอป (Include in App) — บันทึก / Approve แล้วจะขึ้นแอปให้เอง</div><div class="chips" id="cInc"></div>
     </div>
@@ -156,12 +158,12 @@
   </form>
 </div>
 
-<script src="session.js?v=20261124a"></script>
+<script src="session.js?v=20261124b"></script>
 <script>Session.require();</script>
-<script src="config.js?v=20261124a"></script>
-<script src="store.js?v=20261124a"></script>
-<script src="api.js?v=20261124a"></script>
-<script src="parts.js?v=20261124a"></script>
+<script src="config.js?v=20261124b"></script>
+<script src="store.js?v=20261124b"></script>
+<script src="api.js?v=20261124b"></script>
+<script src="parts.js?v=20261124b"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>

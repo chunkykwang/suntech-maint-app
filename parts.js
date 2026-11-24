@@ -5,7 +5,8 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var D = null, R = null, PHOTOS = {}, PHOTO_REQ = {}, VIEW = 'home', MODE = 'new';
+  var D = null, R = null, PHOTOS = {}, PHOTO_REQ = {}, VIEW = 'home', MODE = 'nag';
+  var REQ_MODES = ['nag', 'sna', 'quick', 'merge', 'new', 'edit'];
   var F = null;                                   // ฟอร์ม: {part, req, data, photo}
   var PHOTO_MAX_KB = 60, CATS = ['0', 'Repair', 'TG', 'N/A'], CLSS = ['Normal', 'PSM'], PLANTS = ['SU1', 'SU2', 'SU3'];
   var ADMIN = Session.isAdmin();
@@ -25,7 +26,7 @@
     $('tReg').classList.toggle('locked', !ADMIN);
     $('lockIco').hidden = ADMIN;
     $('regSub').textContent = ADMIN ? 'Wait approve · Incomplete data · แก้ข้อมูล part' : 'เฉพาะ admin';
-    var w = R ? ['new', 'edit', 'quick', 'na'].reduce(function (n, k) { return n + reqsOf(k).length; }, 0) : 0;
+    var w = R ? REQ_MODES.reduce(function (n, k) { return n + reqsOf(k).length; }, 0) : 0;
     $('waitCnt').hidden = !ADMIN || !w; $('waitCnt').textContent = w;
   }
   window.addEventListener('online', function () { paint(); refreshList(); });
@@ -217,46 +218,63 @@
     add('Category', s.category); add('Manage type', s.manage); add('Stock class', s.cls);
     return out.join('');
   }
-  /* แยกรายการรอ approve ตาม Request type (R1–R3) */
+  /* แยกรายการรอ approve ตาม bucket (GG 24 Nov 2026: NA_GROUP / SUGGEST_NA / QUICK / MERGE / NEW) */
+  var BUCKET = { nag: 'NA_GROUP', sna: 'SUGGEST_NA', quick: 'QUICK', merge: 'MERGE', new: 'NEW' };
   function reqsOf(kind) {
     return R.requests.filter(function (q) {
-      if (kind === 'new') return q.type === 'New part';
-      if (kind === 'quick') return q.type === 'Quick confirm';
-      if (kind === 'na') return q.type === 'N/A group';
+      if (BUCKET[kind]) return q.bucket === BUCKET[kind];
       if (kind === 'edit') return q.type === 'Edit existing' && partById(q.partId) && Object.keys(q.suggested || {}).length;
       return false;
     });
   }
+  function isRcpt(q) { return q.type === 'Receipt'; }
+  // part ใน Parts หรือที่ยังอยู่ใน Wait_Approve_Parts
+  function partAny(id) { return partById(id) || (R.wait || []).filter(function (p) { return p.id === id; })[0]; }
+  var CATE_MAP = { REPR: 'Repair', TG: 'TG' };
+  function plainDetail(q) { return String(q.detail || '').replace(/^\s*[A-Z]{2,5}\s*:\s*/, ''); }
   // part ใหม่ / รายการจาก PO: ใช้ข้อมูลที่แนะนำ + Detail ต้นทาง
   function pseudo(q) {
-    var s = q.suggested || {};
-    return { id: q.partId, name: s.name || '', model: s.model || '', brand: s.brand || '', desc: s.desc || '', unit: s.unit || '',
-             types: s.types || [], models: s.models || [], sectors: s.sectors || [], group: s.group || '', manage: s.manage || q.manage || '',
-             minSU1: '', minSU2: '', minSU3: '', photo: '', include: 'Y' };
+    var s = q.suggested || {}, r = isRcpt(q);
+    return { id: q.sugPartId || q.partId, name: s.name || '', model: s.model || '', brand: s.brand || '', desc: s.desc || (r ? plainDetail(q) : ''),
+             unit: s.unit || '', price: r ? String(s.price == null ? '' : s.price) : '', supplier: r ? s.sup || '' : s.supplier || '',
+             category: r ? CATE_MAP[q.itemCate] || '' : s.category || '',
+             types: r ? [] : s.types || [], models: r ? [] : s.models || [], sectors: r ? [] : s.sectors || [], group: r ? '' : s.group || '',
+             manage: r ? '' : s.manage || q.manage || '', cls: '', minSU1: '', minSU2: '', minSU3: '', photo: '', include: 'Y' };
+  }
+  function money(n) { n = Number(n); return isNaN(n) ? '' : n.toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+  // ข้อมูลรับเข้าจาก PO (เห็นเฉพาะหน้า admin)
+  function rcptLine(q) {
+    var g = q.suggested || {};
+    var a = [g.plant, g.date, g.po ? 'PO ' + g.po + (g.seq ? ' #' + g.seq : '') : '', g.inv ? 'Inv ' + g.inv : '',
+             g.rq != null ? 'รับ ' + money(g.rq) + (g.oq != null && g.oq !== g.rq ? '/' + money(g.oq) : '') + ' ' + (g.unit || '') : '',
+             g.price != null ? money(g.price) + ' ' + (g.cur || '') + (g.amt != null ? ' (รวม ' + money(g.amt) + ')' : '') : '', g.sup].filter(Boolean);
+    return '<div class="rc">' + a.map(esc).join(' · ') + (g.acc ? '<br><span class="mu">' + esc(g.acc) + (g.bud ? ' · ' + esc(g.bud) : '') + '</span>' : '') + '</div>';
   }
   function reqTitle(q) {
+    if (isRcpt(q)) { var t = plainDetail(q); return t ? (t.length > 70 ? t.slice(0, 68) + '…' : t) : q.reqId; }
     var p = q.type === 'Edit existing' ? partById(q.partId) : pseudo(q);
     return lbl(p || {}) || q.detail || q.partId;
   }
   function srcInfo(q) {
     var out = [];
     if (q.detail) out.push('<div class="src">' + esc(q.detail) + '</div>');
+    if (isRcpt(q)) out.push(rcptLine(q));
     var m = [];
     if (q.itemCate) m.push('ITEM CATE ' + esc(q.itemCate));
     if (q.receipts && q.receipts.length) m.push('Receipts ' + q.receipts.length + ' แถว');
-    if (q.at) m.push(esc(q.at));
+    if (q.reqId) m.push(esc(q.reqId));
     if (m.length) out.push('<div class="mu">' + m.join(' · ') + '</div>');
     return out.join('');
   }
 
   function renderReg() {
     if (!R) { $('regList').innerHTML = '<div class="empty">' + (navigator.onLine ? 'กำลังโหลด…' : 'ต้องต่อเน็ตเพื่อเปิด Part registration') + '</div>'; return; }
-    var inc = incParts(), counts = { new: reqsOf('new').length, edit: reqsOf('edit').length, quick: reqsOf('quick').length, na: reqsOf('na').length };
-    Object.keys(counts).forEach(function (k) { $('n_' + k).textContent = counts[k] ? '(' + counts[k] + ')' : ''; });
+    var inc = incParts();
+    REQ_MODES.forEach(function (k) { var n = k === 'new' ? pendGroups(reqsOf('new')).length : reqsOf(k).length; $('n_' + k).textContent = n ? '(' + n + ')' : ''; });
     $('n_inc').textContent = '(' + inc.length + ')';
     var box = $('regList'); box.innerHTML = '';
     $('bulk').hidden = true;
-    var reqMode = ['new', 'edit', 'quick', 'na'].indexOf(MODE) >= 0;
+    var reqMode = REQ_MODES.indexOf(MODE) >= 0;
     $('regSlicers').hidden = reqMode && MODE !== 'edit';
     if (reqMode) return renderReqs(box);
     var base = MODE === 'inc' ? inc : R.parts;
@@ -277,14 +295,30 @@
     loadPhotos(ps.slice(0, 300));
   }
 
+  // แถว NEW ที่เป็นชิ้นเดียวกัน (PEND เดียวกัน) รวมเป็นการ์ดเดียว
+  function pendGroups(reqs) {
+    var g = {}, order = [];
+    reqs.forEach(function (q) { var k = q.sugPartId || q.partId || q.reqId; if (!g[k]) { g[k] = []; order.push(k); } g[k].push(q); });
+    return order.map(function (k) { return { key: k, reqs: g[k] }; });
+  }
+  function targetLine(id) {
+    var t = partAny(id);
+    return '<div class="match">→ <b>' + esc(id || '?') + '</b> ' + esc(t ? lbl(t) : '(ไม่พบใน Parts / Wait_Approve_Parts)') + ' ' + manTag(t && t.manage) +
+      (t && t.wait ? ' <span class="tag md">อยู่ใน Wait_Approve_Parts — จะย้ายเข้า Parts</span>' : '') + '</div>';
+  }
   function renderReqs(box) {
     var q0 = $('rq').value.trim().toLowerCase();
-    var reqs = reqsOf(MODE).filter(function (q) { return !q0 || [q.partId, reqTitle(q), q.detail, q.sugPartId].join(' ').toLowerCase().indexOf(q0) >= 0; });
-    var hints = { new: 'part ใหม่จาก PO — Approve (ออก Part ID จริง) / Merge กับ Part ID เดิม / Reject',
-                  edit: 'ข้อมูลที่ระบบแนะนำให้ part ที่มีอยู่แล้ว', quick: 'เจอใน Match_Memory หรือ Parts แล้ว — ตรวจคู่ที่จับได้ แล้วยืนยันทีละหลายแถว',
-                  na: 'ITEM CATE เป็น OFFI / OTHE / MISC — ไม่ออก Part ID ไม่บวก stock' };
-    $('regHint').textContent = reqs.length + ' รายการ · ' + hints[MODE];
+    var reqs = reqsOf(MODE).filter(function (q) { return !q0 || [q.partId, q.reqId, reqTitle(q), q.detail, q.sugPartId, q.itemCate, (q.suggested || {}).sup, (q.suggested || {}).po].join(' ').toLowerCase().indexOf(q0) >= 0; });
+    var hints = { nag: 'ITEM CATE OFFI / OTHE / MISC — ไม่ออก Part ID ไม่บวก stock · เอาติ๊กออกได้ก่อนกด Confirm',
+                  sna: 'GG เสนอว่าไม่เกี่ยวกับงานซ่อม → N/A · เอาติ๊กออกได้ก่อนกด Confirm',
+                  quick: 'ข้อความตรงกับ part เดิม — ตรวจคู่ที่จับได้ แล้วยืนยันทีละหลายแถว',
+                  merge: 'ใกล้เคียง part เดิม — เทียบแล้วเลือก Merge / New / Reject',
+                  new: 'ไม่พบใน DB — ลงทะเบียน part ใหม่ (แถวที่ PEND เดียวกันรวมเป็นการ์ดเดียว)',
+                  edit: 'ข้อมูลที่ระบบแนะนำให้ part ที่มีอยู่แล้ว' };
+    var groups = MODE === 'new' ? pendGroups(reqs) : null;
+    $('regHint').textContent = (groups ? groups.length + ' part (' + reqs.length + ' แถว)' : reqs.length + ' รายการ') + ' · ' + hints[MODE];
     if (!reqs.length) { box.innerHTML = '<div class="empty">ไม่มีรายการรอ approve</div>'; return; }
+    var multi = MODE === 'nag' || MODE === 'sna' || MODE === 'quick';
 
     if (MODE === 'edit') {
       var hi = reqs.filter(function (q) { return String(q.confidence).toLowerCase() === 'high'; });
@@ -292,52 +326,77 @@
       $('bulkBtn').textContent = 'Approve ทั้งหมดที่ Confidence High';
       $('bulkBtn').onclick = function () { approveHigh(hi); };
     }
-    if (MODE === 'quick' || MODE === 'na') {
+    if (multi) {
       $('bulk').hidden = false;
       var sel = function () { return [].slice.call(box.querySelectorAll('input[data-sel]:checked')).map(function (x) { return reqs[+x.dataset.sel]; }); };
+      var cnt = function () { var n = sel().length; $('bulkBtn').textContent = (MODE === 'quick' ? 'ยืนยันที่เลือก' : 'Confirm N/A ทั้งกลุ่ม') + ' (' + n + ')'; $('bulkBtn').disabled = !n; };
       $('bulkTxt').innerHTML = '<label class="selall"><input type="checkbox" id="selAll" checked> เลือกทั้งหมด</label>';
-      $('bulkBtn').textContent = MODE === 'quick' ? 'ยืนยันที่เลือก' : 'ยืนยันเป็น N/A ทั้งกลุ่ม';
       $('bulkBtn').onclick = function () { decideMany(sel(), MODE === 'quick' ? 'approve' : 'na'); };
-      setTimeout(function () { $('selAll').onchange = function () { box.querySelectorAll('input[data-sel]').forEach(function (x) { x.checked = $('selAll').checked; }); }; });
+      setTimeout(function () {
+        $('selAll').onchange = function () { box.querySelectorAll('input[data-sel]').forEach(function (x) { x.checked = $('selAll').checked; }); cnt(); };
+        box.querySelectorAll('input[data-sel]').forEach(function (x) { x.onchange = cnt; });
+        cnt();
+      });
+    }
+
+    if (groups) {
+      groups.forEach(function (gr) {
+        var q = gr.reqs[0], d = document.createElement('div'); d.className = 'req';
+        d.innerHTML = '<div class="top"><b>' + esc(gr.key) + ' · ' + esc(reqTitle(q)) + '</b>' + (gr.reqs.length > 1 ? '<span class="tag md">' + gr.reqs.length + ' แถว</span>' : '') + '</div>' +
+          gr.reqs.map(function (x) { return srcInfo(x); }).join('<hr class="sep">') + (q.reason ? '<div class="why">' + esc(q.reason) + '</div>' : '') +
+          '<div class="acts"><button type="button" class="btn primary sm" data-a="new">ลงทะเบียน part ใหม่</button><button type="button" class="btn sm" data-a="merge">Merge กับ part เดิม</button><button type="button" class="btn sm" data-a="no">Reject</button></div>';
+        var on = function (a, fn) { d.querySelector('[data-a=' + a + ']').onclick = fn; };
+        on('new', function () { openForm(pseudo(q), q, true, gr.reqs); });
+        on('merge', function () { openMerge(q, gr.reqs); });
+        on('no', function (e) { if (confirm('Reject ' + gr.key + ' (' + gr.reqs.length + ' แถว)? GG จะไม่เสนอรายการนี้ซ้ำ')) decide(q, 'reject', null, e.target, '', gr.reqs); });
+        box.appendChild(d);
+      });
+      return;
     }
 
     reqs.forEach(function (q, i) {
       var d = document.createElement('div'); d.className = 'req';
-      var top = '<div class="top"><b>' + (MODE === 'quick' || MODE === 'na' ? '<input type="checkbox" data-sel="' + i + '" checked aria-label="เลือก"> ' : '') +
-        esc(reqTitle(q)) + '</b>' + confTag(q.confidence) + '</div>';
+      var top = '<div class="top"><b>' + (multi ? '<input type="checkbox" data-sel="' + i + '" checked aria-label="เลือก"> ' : '') +
+        esc(reqTitle(q)) + '</b>' + (q.itemCate ? '<span class="tag">' + esc(q.itemCate) + '</span>' : '') + confTag(q.confidence) + '</div>';
       var body = '', acts = '';
       if (MODE === 'edit') {
         var p = partById(q.partId);
         body = '<div class="mu">' + esc(p.id) + ' ' + manTag(p.manage) + '</div><div class="why">' + esc(q.reason) + '</div><div class="sg">' + sugRows(q.suggested) + '</div>';
         acts = '<button type="button" class="btn primary sm" data-a="ok">Approve</button><button type="button" class="btn sm" data-a="edit">แก้ก่อน</button><button type="button" class="btn sm" data-a="no">Reject</button>';
-      } else if (MODE === 'new') {
-        body = '<div class="mu">' + esc(q.partId) + (q.sugPartId ? ' · ใกล้เคียง <b>' + esc(q.sugPartId) + '</b> ' + esc(lbl(partById(q.sugPartId) || {})) : '') + '</div>' +
-          srcInfo(q) + (q.reason ? '<div class="why">' + esc(q.reason) + '</div>' : '') + '<div class="sg">' + sugRows(q.suggested) + '</div>';
-        acts = '<button type="button" class="btn primary sm" data-a="new">Approve</button><button type="button" class="btn sm" data-a="merge">Merge</button><button type="button" class="btn sm" data-a="no">Reject</button>';
       } else if (MODE === 'quick') {
-        var t = partById(q.sugPartId);
-        body = srcInfo(q) + '<div class="match">→ <b>' + esc(q.sugPartId || '?') + '</b> ' + esc(t ? lbl(t) : '(ไม่พบใน Parts)') + ' ' + manTag(t && t.manage) + '</div>';
+        body = srcInfo(q) + targetLine(q.sugPartId);
         acts = '<button type="button" class="btn sm" data-a="merge">เปลี่ยน Part ID</button><button type="button" class="btn sm" data-a="no">Reject</button>';
-      } else {
-        body = srcInfo(q);
+      } else if (MODE === 'merge') {
+        var t = partAny(q.sugPartId);
+        body = '<div class="cmp"><div><span class="mu">part เดิม</span>' + (t ? '<b>' + esc(t.id) + '</b> ' + esc(lbl(t)) + ' ' + manTag(t.manage) +
+            (t.desc ? '<div class="mu">' + esc(t.desc) + '</div>' : '') + (t.wait ? '<div><span class="tag md">อยู่ใน Wait_Approve_Parts</span></div>' : '') : '<b>' + esc(q.sugPartId || '?') + '</b> (ไม่พบ)') +
+          '</div><div><span class="mu">ข้อความใหม่</span>' + srcInfo(q) + '</div></div>' + (q.reason ? '<div class="why">' + esc(q.reason) + '</div>' : '');
+        acts = '<button type="button" class="btn primary sm" data-a="mok"' + (t ? '' : ' disabled') + '>Merge → ' + esc(q.sugPartId || '?') + '</button>' +
+          '<button type="button" class="btn sm" data-a="merge">เลือก part อื่น</button><button type="button" class="btn sm" data-a="new">New</button><button type="button" class="btn sm" data-a="no">Reject</button>';
+      } else {                                   // nag / sna
+        body = srcInfo(q) + (MODE === 'sna' && q.reason ? '<div class="why">' + esc(q.reason) + '</div>' : '');
         acts = '<button type="button" class="btn sm" data-a="new">ไม่ใช่ N/A → ลงทะเบียน</button><button type="button" class="btn sm" data-a="merge">Merge</button><button type="button" class="btn sm" data-a="no">Reject</button>';
       }
       d.innerHTML = top + body + '<div class="acts">' + acts + '</div>';
       var on = function (a, fn) { var b = d.querySelector('[data-a=' + a + ']'); if (b) b.onclick = fn; };
       on('ok', function (e) { decide(q, 'approve', null, e.target); });
       on('edit', function () { openForm(partById(q.partId), q); });
-      on('new', function () { openForm(pseudo(q), q, true); });
+      on('new', function () { openForm(pseudo(q), q, true, [q]); });
       on('merge', function () { openMerge(q); });
+      on('mok', function (e) { if (confirm('Merge "' + reqTitle(q) + '" เข้ากับ ' + q.sugPartId + '?')) decide(q, 'merge', null, e.target, q.sugPartId); });
       on('no', function (e) { if (confirm('Reject "' + reqTitle(q) + '"? รายการนี้จะไม่ถูกเสนอซ้ำ')) decide(q, 'reject', null, e.target); });
       box.appendChild(d);
     });
   }
 
-  function decide(q, decision, changes, btn, target) {
+  function decide(q, decision, changes, btn, target, group) {
     if (!navigator.onLine) { toast('ต้องต่อเน็ตเพื่อบันทึก'); return Promise.reject(new Error('offline')); }
     if (btn) btn.disabled = true;
-    return acall('part.decide', { reqId: q.reqId, decision: decision, changes: changes, target: target || '' }, 60000).then(function (r) {
-      toast((r.partId || q.partId) + ': ' + r.status);
+    var args = { reqId: q.reqId, decision: decision, changes: changes, target: target || '' };
+    if (group && group.length) args.reqIds = group.map(function (x) { return x.reqId; });
+    return acall('part.decide', args, 120000).then(function (r) {
+      if (r.failed && r.failed.length) showErr(r.failed.join('\n'));
+      toast((r.partId || q.partId || q.reqId) + ': ' + r.status + (r.created != null ? ' · Receipts ใหม่ ' + r.created + (r.reused ? ' · ซ้ำ ' + r.reused : '') : ''));
       return refreshReg(true).then(function () { renderReg(); refreshList(); return r; });
     }, function (er) { if (btn) btn.disabled = false; toast('บันทึกไม่ได้: ' + er.message); throw er; });
   }
@@ -365,9 +424,9 @@
   }
 
   /* ---------- Merge: เลือก Part ID เดิม (คำแนะนำ หรือค้นหา) ---------- */
-  var MQ = null;
-  function openMerge(q) {
-    MQ = q;
+  var MQ = null, MG = null;
+  function openMerge(q, group) {
+    MQ = q; MG = group || null;
     $('mTitle').textContent = 'Merge: ' + reqTitle(q);
     $('mSrc').innerHTML = srcInfo(q);
     $('mq').value = '';
@@ -376,14 +435,15 @@
   }
   function renderMerge() {
     var t = $('mq').value.trim().toLowerCase(), q = MQ, box = $('mList'); box.innerHTML = '';
-    var list = R.parts.filter(function (p) { return !t || [p.id, p.name, p.brand, p.model, p.desc].join(' ').toLowerCase().indexOf(t) >= 0; });
+    var list = R.parts.concat(isRcpt(q) ? R.wait || [] : []).filter(function (p) { return !t || [p.id, p.name, p.brand, p.model, p.desc].join(' ').toLowerCase().indexOf(t) >= 0; });
     if (!t && q.sugPartId) list.sort(function (a, b) { return (b.id === q.sugPartId) - (a.id === q.sugPartId); });
     list.slice(0, 40).forEach(function (p) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'mrow';
-      b.innerHTML = '<b>' + esc(p.id) + '</b> ' + esc(lbl(p)) + ' ' + manTag(p.manage) + (p.id === q.sugPartId ? ' <span class="tag md">แนะนำ</span>' : '');
+      b.innerHTML = '<b>' + esc(p.id) + '</b> ' + esc(lbl(p)) + ' ' + manTag(p.manage) + (p.id === q.sugPartId ? ' <span class="tag md">แนะนำ</span>' : '') +
+        (p.wait ? ' <span class="tag">Wait_Approve_Parts</span>' : '');
       b.onclick = function () {
-        if (!confirm('รวม "' + reqTitle(q) + '" เข้ากับ ' + p.id + ' ' + lbl(p) + '?')) return;
-        decide(q, 'merge', null, b, p.id).then(function () { $('merge').hidden = true; }, function () {});
+        if (!confirm('รวม "' + reqTitle(q) + '"' + (MG && MG.length > 1 ? ' (' + MG.length + ' แถว)' : '') + ' เข้ากับ ' + p.id + ' ' + lbl(p) + '?')) return;
+        decide(q, 'merge', null, b, p.id, MG).then(function () { $('merge').hidden = true; }, function () {});
       };
       box.appendChild(b);
     });
@@ -398,16 +458,18 @@
   var INPUTS = { name: 'iName', model: 'iModel', desc: 'iDesc', brand: 'iBrand', unit: 'iUnit', price: 'iPrice', supplier: 'iSupplier' };
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
-  function openForm(p, req, isNew) {
+  function openForm(p, req, isNew, group) {
     var data = {};
     FIELDS.forEach(function (k) { data[k] = clone(p[k] == null ? (/s$/.test(k) && k !== 'cls' ? [] : '') : p[k]); });
     var sug = req ? req.suggested || {} : {};
     Object.keys(sug).forEach(function (k) { if (k in data) data[k] = clone(sug[k]); });
     data.include = 'Y';                           // approve / บันทึกแล้ว = ขึ้นแอป (เลือก "ไม่ใช้" เองได้)
-    F = { part: p, req: req || null, data: data, sug: sug, photo: null, kb: 0, isNew: !!isNew };
+    if (req && isRcpt(req)) { sug = {}; data = {}; FIELDS.forEach(function (k) { data[k] = clone(p[k] == null ? (/s$/.test(k) && k !== 'cls' ? [] : '') : p[k]); }); data.include = 'Y'; }
+    F = { part: p, req: req || null, data: data, sug: sug, photo: null, kb: 0, isNew: !!isNew, group: group || null };
     $('fTitle').textContent = isNew ? 'ลงทะเบียน part ใหม่ (' + p.id + ')' : (req ? 'ตรวจข้อมูลแนะนำ ' : 'แก้ข้อมูล ') + p.id;
     $('sugBox').hidden = !req;
-    if (req) $('sugBox').innerHTML = (isNew ? '<b>ข้อมูลจาก PO</b> ' : '<b>ข้อมูลที่ระบบแนะนำ</b> ') + confTag(req.confidence) + srcInfo(req) +
+    if (req) $('sugBox').innerHTML = (isNew ? '<b>ข้อมูลจาก PO</b> ' : '<b>ข้อมูลที่ระบบแนะนำ</b> ') + confTag(req.confidence) +
+      (group && group.length > 1 ? group.map(srcInfo).join('<hr class="sep">') + '<div class="mu">ลงทะเบียนครั้งเดียว ใช้กับทั้ง ' + group.length + ' แถว</div>' : srcInfo(req)) +
       (req.reason ? '<div>' + esc(req.reason) + '</div>' : '') + '<span class="mu">ช่องที่มีกรอบสีส้ม = ค่าที่แนะนำ แก้ได้ก่อนกด Approve' +
       (isNew ? ' · ต้องเลือก Manage type · Part ID จริงออกตอน Approve' : '') + '</span>';
     $('bReject').hidden = !req;
@@ -549,8 +611,8 @@
     if (!navigator.onLine) { toast('ต้องต่อเน็ตเพื่อบันทึก'); return; }
     var ch = F.isNew ? clone(F.data) : changesOf(), p = F.part, req = F.req, photo = F.photo;
     if (F.isNew) {
-      if (!String(F.data.name || '').trim()) { toast('กรอก Name ก่อน'); $('iName').focus(); return; }
       if (!F.data.manage) { toast('เลือก Manage type ก่อน (Control / Uncontrol / N/A)'); $('cMan').scrollIntoView({ block: 'center' }); return; }
+      if (F.data.manage !== 'N/A' && !String(F.data.name || '').trim()) { toast('กรอก Name ก่อน'); $('iName').focus(); return; }
     }
     if (!Object.keys(ch).length && !photo && !req) { toast('ไม่มีอะไรเปลี่ยน'); return; }
     $('bSave').disabled = true; $('saveHint').textContent = 'กำลังบันทึก…';
@@ -560,7 +622,12 @@
     };
     var pidDone = p.id;
     (F.isNew
-      ? acall('part.decide', { reqId: req.reqId, decision: 'approve', changes: ch }, 60000).then(function (r) { pidDone = r.partId || p.id; return upPhoto(pidDone); })
+      ? acall('part.decide', Object.assign({ reqId: req.reqId, decision: 'approve', changes: ch }, F.group ? { reqIds: F.group.map(function (x) { return x.reqId; }) } : {}), 120000)
+          .then(function (r) {
+            if (r.failed && r.failed.length) showErr(r.failed.join('\n'));
+            pidDone = r.partId || (r.manage === 'N/A' ? 'N/A (ไม่ออก Part ID)' : p.id);
+            return r.partId ? upPhoto(r.partId) : null;
+          })
       : upPhoto(p.id).then(function () {
           if (req) return acall('part.decide', { reqId: req.reqId, decision: 'approve', changes: ch }, 60000);
           if (Object.keys(ch).length) return acall('part.save', { partId: p.id, changes: ch }, 60000);
@@ -571,7 +638,7 @@
       return refreshReg(true).then(function () { show('reg'); refreshList(); });
     }, function (er) { $('bSave').disabled = false; $('saveHint').textContent = 'ต้องต่อเน็ตเพื่อบันทึก'; toast('บันทึกไม่ได้: ' + er.message); });
   };
-  $('bReject').onclick = function () { if (F.req && confirm('Reject "' + reqTitle(F.req) + '"?')) decide(F.req, 'reject', null, $('bReject')).then(function () { show('reg'); }, function () {}); };
+  $('bReject').onclick = function () { if (F.req && confirm('Reject "' + reqTitle(F.req) + '"?')) decide(F.req, 'reject', null, $('bReject'), '', F.group).then(function () { show('reg'); }, function () {}); };
   $('fBack').onclick = function () { show(R ? 'reg' : 'list'); };
 
   /* ---------- views ---------- */
