@@ -111,13 +111,16 @@
     var models = uniq([].concat.apply([], parts.map(function (p) { return p.models; }))).filter(function (x) { return !tv || x.split('|')[0] === tv; }).sort();
     keep($(m), opt('', 'ทั้งหมด') + models.map(function (x) { return opt(x, modelLabel(x)); }).join(''));
   }
-  function sliced(parts, q, g, t, m) {
-    q = $(q).value.trim().toLowerCase(); g = $(g).value; t = $(t).value; m = $(m).value;
+  function sliced(parts, q, g, t, m, c) {
+    q = $(q).value.trim().toLowerCase(); g = $(g).value; t = $(t).value; m = $(m).value; c = c ? $(c).value : '';
     return parts.filter(function (p) {
+      var hasC = !!String(p.cmms || '').trim() && p.cmms !== '-';
+      if (c === 'has' && !hasC) return false;
+      if (c === 'none' && hasC) return false;
       if (g === '-' ? p.group : (g && p.group !== g)) return false;
       if (t && p.types.indexOf(t) < 0) return false;
       if (m && p.models.indexOf(m) < 0) return false;
-      return !q || [p.id, p.name, p.model, p.desc, p.brand].join(' ').toLowerCase().indexOf(q) >= 0;
+      return !q || [p.id, p.name, p.model, p.desc, p.brand, p.cmms].join(' ').toLowerCase().indexOf(q) >= 0;
     });
   }
   // R6: แสดง Name · Brand · Model คู่กันเสมอ / R7: tag ตาม Manage type
@@ -143,27 +146,28 @@
   function renderList() {
     if (!D) { $('list').innerHTML = ''; return; }
     fillSlicers(D, D.parts, 'fGroup', 'fType', 'fModel');
-    var ps = sliced(D.parts, 'q', 'fGroup', 'fType', 'fModel');
-    $('listHint').textContent = ps.length + ' จาก ' + D.parts.length + ' รายการ';
+    var ps = sliced(D.parts, 'q', 'fGroup', 'fType', 'fModel', 'fCmms');
+    var nC = D.parts.filter(function (p) { return String(p.cmms || '').trim() && p.cmms !== '-'; }).length;
+    $('listHint').textContent = ps.length + ' จาก ' + D.parts.length + ' รายการ · มี CMMS ID ' + nC + ' / ยังไม่มี ' + (D.parts.length - nC);
     $('list').innerHTML = ps.length ? '' : '<div class="empty">ไม่พบ part</div>';
     ps.slice(0, 300).forEach(function (p) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'pcard';
       b.innerHTML = picHtml(p) + '<div><div class="nm">' + esc(lbl(p)) + '</div>' + (p.desc ? '<div class="md">' + esc(p.desc) + '</div>' : '') +
-        '<div class="tags"><span class="tag">' + esc(p.id) + '</span>' + manTag(p.manage) + (p.group ? '<span class="tag g">' + esc(p.group) + '</span>' : '') +
+        '<div class="tags"><span class="tag">' + esc(p.id) + '</span>' + (p.cmms && p.cmms !== '-' ? '<span class="tag cm">CMMS ' + esc(p.cmms) + '</span>' : '') + manTag(p.manage) + (p.group ? '<span class="tag g">' + esc(p.group) + '</span>' : '') +
         p.types.map(function (t) { return '<span class="tag">' + esc(typeLabel(D, t)) + '</span>'; }).join('') + minTags(p) + ohTags(p) + '</div></div>';
       b.onclick = function () { openDetail(p); };
       $('list').appendChild(b);
     });
     loadPhotos(ps.slice(0, 300));
   }
-  ['q', 'fGroup', 'fType', 'fModel'].forEach(function (id) { $(id).addEventListener(id === 'q' ? 'input' : 'change', renderList); });
+  ['q', 'fGroup', 'fType', 'fModel', 'fCmms'].forEach(function (id) { $(id).addEventListener(id === 'q' ? 'input' : 'change', renderList); });
 
   function openDetail(p) {
     var src = p.photo && PHOTOS[p.photo];
     var row = function (k, v) { return v ? '<span>' + k + '</span><b>' + esc(v) + '</b>' : ''; };
     $('detailBox').innerHTML = (src ? '<img class="big" alt="" src="' + src + '">' : '') +
       '<h2 style="margin:10px 0 2px">' + esc(lbl(p)) + '</h2><div class="mu">' + esc(p.id) + ' ' + manTag(p.manage) + '</div>' +
-      '<div class="kv">' + row('Model', p.model) + row('Description', p.desc) + row('Brand', p.brand) + row('Unit', p.unit) +
+      '<div class="kv">' + row('CMMS ID', p.cmms && p.cmms !== '-' ? p.cmms : '— ยังไม่มี —') + row('Model', p.model) + row('Description', p.desc) + row('Brand', p.brand) + row('Unit', p.unit) +
       row('Group', p.group) + row('Machine type', p.types.map(function (t) { return typeLabel(D, t); }).join(', ')) +
       row('Machine model', p.models.map(modelLabel).join(', ')) + row('Sector', p.sectors.join(', ')) +
       row('Min stock', PLANTS.filter(function (pl) { return p['min' + pl] !== ''; }).map(function (pl) { return pl + ': ' + p['min' + pl]; }).join(' · ')) +
@@ -206,7 +210,7 @@
       renderReg();
     };
   });
-  ['rq', 'rGroup', 'rType', 'rModel'].forEach(function (id) { $(id).addEventListener(id === 'rq' ? 'input' : 'change', renderReg); });
+  ['rq', 'rGroup', 'rType', 'rModel', 'rCmms'].forEach(function (id) { $(id).addEventListener(id === 'rq' ? 'input' : 'change', renderReg); });
   $('bRegReload').onclick = function () { refreshReg(); };
 
   function confTag(c) { c = String(c || '').toLowerCase(); return c ? '<span class="tag ' + (c === 'high' ? 'hi' : c === 'medium' ? 'md' : 'lo') + '">' + esc(c[0].toUpperCase() + c.slice(1)) + '</span>' : ''; }
@@ -279,14 +283,14 @@
     if (reqMode) return renderReqs(box);
     var base = MODE === 'inc' ? inc : R.parts;
     fillSlicers(R, base, 'rGroup', 'rType', 'rModel');
-    var ps = sliced(base, 'rq', 'rGroup', 'rType', 'rModel');
+    var ps = sliced(base, 'rq', 'rGroup', 'rType', 'rModel', 'rCmms');
     $('regHint').textContent = MODE === 'inc' ? ps.length + ' part (ใช้ในแอป) ที่ข้อมูลยังไม่ครบ' : ps.length + ' จาก ' + R.parts.length + ' part · แตะเพื่อแก้';
     if (!ps.length) box.innerHTML = '<div class="empty">ไม่มีรายการ</div>';
     ps.slice(0, 300).forEach(function (p) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'pcard';
       var miss = missing(p);
       b.innerHTML = picHtml(p) + '<div><div class="nm">' + esc(lbl(p)) + '</div>' +
-        '<div class="tags"><span class="tag">' + esc(p.id) + '</span>' + manTag(p.manage) + (String(p.include).toUpperCase() === 'Y' ? '' : '<span class="tag">ไม่ใช้ในแอป</span>') +
+        '<div class="tags"><span class="tag">' + esc(p.id) + '</span>' + (p.cmms && p.cmms !== '-' ? '<span class="tag cm">CMMS ' + esc(p.cmms) + '</span>' : '') + manTag(p.manage) + (String(p.include).toUpperCase() === 'Y' ? '' : '<span class="tag">ไม่ใช้ในแอป</span>') +
         (p.group ? '<span class="tag g">' + esc(p.group) + '</span>' : '') + minTags(p) +
         (MODE === 'inc' ? miss.map(function (m) { return '<span class="tag miss">ขาด ' + m + '</span>'; }).join('') : '') + '</div></div>';
       b.onclick = function () { openForm(p); };
@@ -454,8 +458,8 @@
   $('merge').addEventListener('click', function (e) { if (e.target === $('merge')) $('merge').hidden = true; });
 
   /* ---------- ฟอร์ม ---------- */
-  var FIELDS = ['name', 'model', 'desc', 'brand', 'unit', 'price', 'supplier', 'category', 'cls', 'manage', 'include', 'group', 'types', 'models', 'sectors', 'minSU1', 'minSU2', 'minSU3'];
-  var INPUTS = { name: 'iName', model: 'iModel', desc: 'iDesc', brand: 'iBrand', unit: 'iUnit', price: 'iPrice', supplier: 'iSupplier' };
+  var FIELDS = ['name', 'model', 'desc', 'brand', 'unit', 'price', 'supplier', 'cmms', 'category', 'cls', 'manage', 'include', 'group', 'types', 'models', 'sectors', 'minSU1', 'minSU2', 'minSU3'];
+  var INPUTS = { name: 'iName', model: 'iModel', desc: 'iDesc', brand: 'iBrand', unit: 'iUnit', price: 'iPrice', supplier: 'iSupplier', cmms: 'iCmms' };
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
   function openForm(p, req, isNew, group) {

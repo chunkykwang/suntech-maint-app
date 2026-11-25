@@ -9,8 +9,8 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="stock.css?v=20261124b">
-<link rel="stylesheet" href="parts.css?v=20261124b">
+<link rel="stylesheet" href="stock.css?v=20261125a">
+<link rel="stylesheet" href="parts.css?v=20261125a">
 </head>
 <body>
 <header>
@@ -44,6 +44,7 @@
       <label>Group<select id="fGroup"></select></label>
       <label>Machine type<select id="fType"></select></label>
       <label>Model<select id="fModel"></select></label>
+      <label>CMMS ID<select id="fCmms"><option value="">ทั้งหมด</option><option value="has">มี CMMS ID</option><option value="none">ยังไม่มี CMMS ID</option></select></label>
     </div>
     <div class="hint" id="listHint"></div>
     <div id="list"></div>
@@ -68,6 +69,7 @@
       <label>Group<select id="rGroup"></select></label>
       <label>Machine type<select id="rType"></select></label>
       <label>Model<select id="rModel"></select></label>
+      <label>CMMS ID<select id="rCmms"><option value="">ทั้งหมด</option><option value="has">มี CMMS ID</option><option value="none">ยังไม่มี CMMS ID</option></select></label>
     </div>
     <div class="bulk" id="bulk" hidden><span id="bulkTxt"></span><button type="button" class="btn primary sm" id="bulkBtn"></button></div>
     <div class="hint" id="regHint"></div>
@@ -102,6 +104,7 @@
         <label>Unit<input id="iUnit" list="unitList"></label>
         <label>ราคา (Base Price)<input id="iPrice" inputmode="decimal"></label>
         <label>Supplier<input id="iSupplier"></label>
+        <label>CMMS ID<input id="iCmms" autocomplete="off" placeholder="รหัสใน CMMS (ถ้ามี)"></label>
       </div>
       <label class="full">Description<input id="iDesc"></label>
       <datalist id="brandList"></datalist><datalist id="unitList"></datalist>
@@ -158,12 +161,12 @@
   </form>
 </div>
 
-<script src="session.js?v=20261124b"></script>
+<script src="session.js?v=20261125a"></script>
 <script>Session.require();</script>
-<script src="config.js?v=20261124b"></script>
-<script src="store.js?v=20261124b"></script>
-<script src="api.js?v=20261124b"></script>
-<script src="parts.js?v=20261124b"></script>
+<script src="config.js?v=20261125a"></script>
+<script src="store.js?v=20261125a"></script>
+<script src="api.js?v=20261125a"></script>
+<script src="parts.js?v=20261125a"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>
