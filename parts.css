@@ -91,3 +91,4 @@ main{padding-bottom:120px}
 .slicers{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:560px){.slicers{grid-template-columns:1fr 1fr}.slicers label:last-child{grid-column:auto}}
 .tag.cm{background:var(--accent-bg);color:var(--accent)}
+.tag.pr{background:var(--warn-bg);color:var(--warn);font-weight:700}

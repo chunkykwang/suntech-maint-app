@@ -142,6 +142,13 @@
       .map(function (pl) { return '<span class="tag min">' + pl + ' min ' + esc(p['min' + pl]) + '</span>'; }).join('');
   }
 
+  // Base Price ต่อหน่วย (อ่านค่ามีลูกน้ำได้ เช่น "25,652") — ว่าง = "-"
+  function priceTxt(p) {
+    var n = Number(String(p.price == null ? '' : p.price).replace(/[,\s฿]/g, ''));
+    if (String(p.price || '').trim() === '' || isNaN(n)) return '-';
+    return n.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ฿' + (p.unit ? ' / ' + p.unit : '');
+  }
+
   /* ---------- Part list ---------- */
   function renderList() {
     if (!D) { $('list').innerHTML = ''; return; }
@@ -153,7 +160,7 @@
     ps.slice(0, 300).forEach(function (p) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'pcard';
       b.innerHTML = picHtml(p) + '<div><div class="nm">' + esc(lbl(p)) + '</div>' + (p.desc ? '<div class="md">' + esc(p.desc) + '</div>' : '') +
-        '<div class="tags"><span class="tag">' + esc(p.id) + '</span>' + (p.cmms && p.cmms !== '-' ? '<span class="tag cm">CMMS ' + esc(p.cmms) + '</span>' : '') + manTag(p.manage) + (p.group ? '<span class="tag g">' + esc(p.group) + '</span>' : '') +
+        '<div class="tags"><span class="tag">' + esc(p.id) + '</span>' + (p.cmms && p.cmms !== '-' ? '<span class="tag cm">CMMS ' + esc(p.cmms) + '</span>' : '') + manTag(p.manage) + '<span class="tag pr">' + esc(priceTxt(p) === '-' ? 'ราคา -' : priceTxt(p)) + '</span>' + (p.group ? '<span class="tag g">' + esc(p.group) + '</span>' : '') +
         p.types.map(function (t) { return '<span class="tag">' + esc(typeLabel(D, t)) + '</span>'; }).join('') + minTags(p) + ohTags(p) + '</div></div>';
       b.onclick = function () { openDetail(p); };
       $('list').appendChild(b);
@@ -167,7 +174,7 @@
     var row = function (k, v) { return v ? '<span>' + k + '</span><b>' + esc(v) + '</b>' : ''; };
     $('detailBox').innerHTML = (src ? '<img class="big" alt="" src="' + src + '">' : '') +
       '<h2 style="margin:10px 0 2px">' + esc(lbl(p)) + '</h2><div class="mu">' + esc(p.id) + ' ' + manTag(p.manage) + '</div>' +
-      '<div class="kv">' + row('CMMS ID', p.cmms && p.cmms !== '-' ? p.cmms : '— ยังไม่มี —') + row('Model', p.model) + row('Description', p.desc) + row('Brand', p.brand) + row('Unit', p.unit) +
+      '<div class="kv">' + row('CMMS ID', p.cmms && p.cmms !== '-' ? p.cmms : '— ยังไม่มี —') + row('Model', p.model) + row('Description', p.desc) + row('Brand', p.brand) + row('Unit', p.unit) + row('ราคา (Base Price)', priceTxt(p)) +
       row('Group', p.group) + row('Machine type', p.types.map(function (t) { return typeLabel(D, t); }).join(', ')) +
       row('Machine model', p.models.map(modelLabel).join(', ')) + row('Sector', p.sectors.join(', ')) +
       row('Min stock', PLANTS.filter(function (pl) { return p['min' + pl] !== ''; }).map(function (pl) { return pl + ': ' + p['min' + pl]; }).join(' · ')) +
