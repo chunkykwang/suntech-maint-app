@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Machine Manual</title>
+<meta name="theme-color" content="#0f2f2a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="repair.css?v=20261126b">
+<link rel="stylesheet" href="overhaul.css?v=20261126b">
+<link rel="stylesheet" href="manual.css?v=20261126b">
+</head>
+<body>
+<header>
+  <a class="back" href="./" id="hBack">&#8592; เมนูหลัก</a>
+  <h1 id="hTitle">Machine Manual</h1>
+  <div class="sync">
+    <span id="net" class="pill" role="status" aria-live="polite">…</span>
+    <span id="pending" class="pill wait" hidden></span>
+    <button id="bSync" type="button" hidden>ส่งตอนนี้</button>
+    <span id="asof" class="asof"></span>
+  </div>
+  <nav class="tabs" role="tablist" id="mTabs" hidden>
+    <button type="button" role="tab" data-tab="alarm" aria-selected="true">Alarm code</button>
+    <button type="button" role="tab" data-tab="step" aria-selected="false">Cycle step</button>
+    <button type="button" role="tab" data-tab="io" aria-selected="false">I/O</button>
+    <button type="button" role="tab" data-tab="doc" aria-selected="false">เอกสาร</button>
+    <button type="button" role="tab" data-tab="log" aria-selected="false">Alarm log</button>
+  </nav>
+</header>
+
+<main>
+  <div id="loading" class="empty">กำลังโหลด…</div>
+  <div id="err" class="errbox" hidden></div>
+
+  <!-- เลือก type > model > เครื่อง -->
+  <section id="v-pick" hidden>
+    <nav class="crumbs" id="crumbs" aria-label="ตำแหน่ง"></nav>
+    <div id="pickList" class="tiles"></div>
+  </section>
+
+  <!-- หน้าเครื่อง -->
+  <section id="v-machine" hidden>
+    <div class="mhead" id="mHead"></div>
+
+    <div id="t-alarm">
+      <p class="note">กดเลข code ที่เห็นบนหน้าจอเครื่อง</p>
+      <div class="codes" id="codes"></div>
+      <div id="alarmDetail"></div>
+    </div>
+
+    <div id="t-step" hidden>
+      <div class="filters2"><input id="sq" type="search" class="search" placeholder="ค้นหา step / MR / sensor / output" aria-label="ค้นหา step">
+        <div class="segu" id="stepUnit" role="radiogroup" aria-label="Unit"></div></div>
+      <p class="note" id="stepNote">ตอน TIME-OVER: ดูใน PLC ว่า MR ตัวไหนยัง ON = step ที่ค้าง แล้วดู output / sensor ของ step นั้น</p>
+      <div id="steps"></div>
+    </div>
+
+    <div id="t-io" hidden>
+      <div class="filters2"><input id="iq" type="search" class="search" placeholder="ค้นหา address / symbol / ชื่อ" aria-label="ค้นหา I/O">
+        <div class="segu" id="ioUnit" role="radiogroup" aria-label="Unit"></div></div>
+      <div class="segu" id="ioType" role="radiogroup" aria-label="ชนิด I/O"></div>
+      <div id="ios"></div>
+    </div>
+
+    <div id="t-doc" hidden><div id="docs"></div></div>
+
+    <div id="t-log" hidden>
+      <div class="acts" style="margin-bottom:10px"><button type="button" class="btn pri" id="bNewLog">+ บันทึก alarm</button></div>
+      <div id="logStat" class="statbox"></div>
+      <div id="logs"></div>
+    </div>
+  </section>
+
+  <!-- ฟอร์มบันทึก alarm -->
+  <section id="v-form" hidden>
+    <section class="card">
+      <h2>บันทึก alarm</h2>
+      <div class="row">
+        <div class="f"><label for="lUnit">Unit</label><select id="lUnit"></select></div>
+        <div class="f"><label for="lAlarm">Alarm code <span class="req">*</span></label><select id="lAlarm"></select></div>
+      </div>
+      <div class="row">
+        <div class="f"><label for="lDate">วันที่ <span class="req">*</span></label><input id="lDate" type="date"></div>
+        <div class="f"><label for="lTime">เวลา</label><input id="lTime" type="time" step="1"></div>
+      </div>
+      <div class="f"><label for="lStep">Step ที่ค้าง (ดูก่อนกด RESET)</label><select id="lStep"></select></div>
+      <div class="f"><label for="lIo">Sensor / I/O ที่ผิดปกติ</label><select id="lIo"></select></div>
+      <div class="f"><label for="lCause">สาเหตุที่พบ</label><textarea id="lCause" rows="2"></textarea></div>
+      <div class="f"><label for="lAction">การแก้ไข</label><textarea id="lAction" rows="2"></textarea></div>
+      <div class="f"><label for="lNote">หมายเหตุ</label><input id="lNote"></div>
+      <p class="note">ผู้บันทึก: <b id="lWho"></b></p>
+      <div class="acts">
+        <button type="button" class="btn ghost" id="bCancelLog">ยกเลิก</button>
+        <button type="button" class="btn pri" id="bSaveLog">บันทึก</button>
+      </div>
+    </section>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="pinwrap" id="pinWrap" hidden>
+  <form class="pinbox" id="pinForm">
+    <h2>ใส่ PIN ของเครื่อง</h2>
+    <p>ใส่ครั้งเดียว เครื่องจะจำไว้ (ขอ PIN จากหัวหน้างาน)</p>
+    <input id="pinIn" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN">
+    <div class="pinerr" id="pinErr" role="alert"></div>
+    <button class="btn pri" type="submit" id="pinOk">ตกลง</button>
+  </form>
+</div>
+
+<script src="session.js?v=20261126b"></script>
+<script src="config.js?v=20261126b"></script>
+<script src="store.js?v=20261126b"></script>
+<script src="api.js?v=20261126b"></script>
+<script src="manual.js?v=20261126b"></script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>
