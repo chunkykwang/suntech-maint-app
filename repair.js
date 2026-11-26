@@ -14,6 +14,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var OTHER = 'อื่นๆ (ระบุ)', ADMIN = Session.ADMIN;
   var M = null, OUTBOX = [], SENT = [], JOBS = [], photos = { p1: null, p2: null }, syncing = false;
+  var MAN = null, MANP = Promise.resolve(), MAN_OUT = [], manSyncing = false, MAN_CUR = null, URLQ = null, PENDING_R = '';   // Machine Manual (ใช้ร่วมกับ manual.html)
   var USER = Session.user(), MODE = 'new', JOB = null, VIEW = '', DETAIL = null, LAST_ASSIGN = null, REFS = [];
   var ALL = [], ALL_AT = '', ALL_ERR = '', ALL_LOADING = false, ALL_RANGE = '';   // ใบแจ้งซ่อมทุกใบจากเซิร์ฟเวอร์ (repair.list)
   var SHARE = null;   // submitId ของใบที่เพิ่งส่ง (หน้าแชร์)
@@ -69,6 +70,9 @@
     Promise.all([Store.get('repair.init'), Store.get('repair.outbox'), Store.get('repair.sent'), Store.get('repair.jobs')]).then(function (r) {
       OUTBOX = r[1] || []; SENT = r[2] || []; JOBS = r[3] || [];
       Store.get('repair.all').then(function (a) { if (a && a.rows) { ALL = a.rows; ALL_AT = a.at || ''; ALL_RANGE = a.range || ''; } }).catch(function () {});
+      MANP = Promise.all([Store.get('manual.db'), Store.get('manual.outbox')]).then(function (x) { MAN = x[0] || null; MAN_OUT = x[1] || []; if (MAN_CUR) paintAlm(); }).catch(function () {});
+      try { URLQ = new URLSearchParams(location.search); } catch (_) { URLQ = null; }
+      var hm = location.hash.match(/^#r=([\w-]+)/); if (hm) PENDING_R = hm[1];
       if (r[0]) use(r[0]);
       paint();
       var go = function () { refresh(); sync(); };
@@ -82,6 +86,7 @@
   function refresh() {
     if (!navigator.onLine || !Api.ready()) return;
     call('repair.init').then(function (d) { Store.set('repair.init', d); use(d); }, function (er) { if (!M) fail('โหลดข้อมูลไม่ได้: ' + er.message); });
+    call('manual.init', {}, 60000).then(function (d) { MAN = d; Store.set('manual.db', d).catch(function () {}); if (MAN_CUR !== null) paintAlm(); if (VIEW === 'detail') renderDetail(); }, function () {});
     refreshJobs();
   }
   function refreshJobs() {
@@ -99,7 +104,29 @@
     $('mtype').innerHTML = opt('', '— เลือกประเภท —') + uniq(M.machines.map(function (m) { return m.type; })).map(function (t) { return opt(t); }).join('');
     if (mt) { $('mtype').value = mt; onType(); if (eq) { $('eq').value = eq; onEq(); } }
     paintDrive();
-    if (first) show('menu');
+    if (first) {
+      show('menu');
+      if (URLQ && URLQ.get('new') === '1') fromManual();
+      else if (PENDING_R) { show('list'); }
+    }
+  }
+  // เปิดจาก Machine Manual: repair.html?new=1&eq=…&alarm=…&unit=…&step=…&io=…&cause=…&action=…
+  function fromManual() {
+    var q = URLQ, m = M.machines.filter(function (x) { return x.eq === q.get('eq'); })[0];
+    openForm('new');
+    MANP.then(function () { fromManual2(q, m); });
+  }
+  function fromManual2(q, m) {
+    if (m) { $('mtype').value = m.type; onType(); $('eq').value = m.eq; onEq(); }
+    if (q.get('cause')) $('cause').value = q.get('cause');
+    if (q.get('action')) $('sol').value = q.get('action');
+    if (MAN_CUR) {
+      if (q.get('unit')) $('maUnit').value = q.get('unit');
+      fillAlmSelects();
+      $('maAlarm').value = q.get('alarm') || ''; onAlarm();
+      $('maStep').value = q.get('step') || ''; $('maIo').value = q.get('io') || '';
+    }
+    try { history.replaceState(null, '', location.pathname); } catch (_) {}
   }
 
   /* ---------- ผู้ใช้ ---------- */
@@ -180,6 +207,7 @@
   }
   function onEq() {
     var m = M.machines.filter(function (x) { return x.eq === $('eq').value; })[0];
+    paintAlm();
     if (!m) { $('info').hidden = true; return; }
     $('info').hidden = false;
     $('info').innerHTML = '<div><span>Description</span><b>' + esc(m.desc) + '</b></div><div><span>Site</span><b>' + esc(m.site) + '</b></div>' +
@@ -187,6 +215,85 @@
   }
   $('mtype').addEventListener('change', onType);
   $('eq').addEventListener('change', onEq);
+
+  /* ---------- Machine Manual: เลือก alarm code ในใบแจ้งซ่อม ---------- */
+  function norm(x) { return String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+  // เครื่องนี้มีคู่มือไหม: machine_no = Equipment No. ก่อน ไม่มีค่อยจับคู่จากชื่อรุ่น (เช่น "HT-LEM 32" = "HT-LEM32")
+  function manFor(eq) {
+    if (!MAN || !eq) return null;
+    var mc = (MAN.machine || []).filter(function (x) { return x.machine_no === eq; })[0];
+    if (mc) return { model_id: mc.model_id, machine_id: mc.machine_id };
+    var m = M.machines.filter(function (x) { return x.eq === eq; })[0];
+    var md = m && (MAN.model || []).filter(function (x) { return norm(x.model) && norm(x.model) === norm(m.model); })[0];
+    return md ? { model_id: md.model_id, machine_id: '' } : null;
+  }
+  function manRows(t) { return ((MAN && MAN[t]) || []).filter(function (r) { return MAN_CUR && r.model_id === MAN_CUR.model_id; }); }
+  function manUnits() {
+    var md = (MAN.model || []).filter(function (x) { return MAN_CUR && x.model_id === MAN_CUR.model_id; })[0];
+    var u = String((md && md.units_per_machine) || '').match(/No\.\s?\d+/gi);
+    return u ? u.map(function (x) { return x.replace(/\s/g, ''); }) : [];
+  }
+  function almLabel(a) { return a ? (a.code && a.code !== '-' ? 'Code ' + a.code + ' ' : '') + a.screen_text : ''; }
+  function paintAlm() {
+    var show = MODE !== 'assign' && !!$('eq').value;
+    MAN_CUR = show ? manFor($('eq').value) : null;
+    $('almBox').hidden = !MAN_CUR;
+    if (!MAN_CUR) return;
+    var u = manUnits();
+    $('maUnit').innerHTML = u.length ? u.map(function (x) { return opt(x); }).join('') : opt('', '-');
+    $('maAlarm').innerHTML = opt('', '— ไม่มี alarm / ไม่ระบุ —') + manRows('alarm_code').slice().sort(function (a, b) { return (+a.sort || 99) - (+b.sort || 99); })
+      .map(function (a) { return opt(a.alarm_id, almLabel(a)); }).join('');
+    $('almLink').href = 'manual.html?eq=' + encodeURIComponent($('eq').value);
+    fillAlmSelects(); onAlarm();
+  }
+  function fillAlmSelects() {
+    var u = $('maUnit').value, i = manUnits().indexOf(u), last = '';
+    var st = $('maStep').value, io = $('maIo').value;
+    $('maStep').innerHTML = opt('', '— ไม่ระบุ —') + manRows('cycle_step').map(function (s) {
+      var g = s.process !== last ? (last ? '</optgroup>' : '') + '<optgroup label="' + esc(s.process) + '">' : ''; last = s.process;
+      return g + opt(s.step_id, s.seq + '. ' + s.step_th + ' (' + ((i === 1 ? s.mr_no2 : s.mr_no1) || '') + ')');
+    }).join('') + (last ? '</optgroup>' : '');
+    $('maIo').innerHTML = opt('', '— ไม่ระบุ —') + manRows('io_point').filter(function (r) { return !u || !r.unit || r.unit.indexOf(u) >= 0; })
+      .map(function (r) { return opt(r.io_id, r.symbol + ' – ' + r.name_th + ' (' + r.address + ')'); }).join('');
+    $('maStep').value = st; $('maIo').value = io;
+  }
+  function onAlarm() {
+    var a = manRows('alarm_code').filter(function (x) { return x.alarm_id === $('maAlarm').value; })[0];
+    $('almMore').hidden = !a;
+    $('almTip').textContent = a ? 'สาเหตุ: ' + a.cause + (a.check_points ? '\nจุดตรวจ: ' + a.check_points : '') : '';
+    if (a && !$('pb').readOnly && !$('pb').value.trim()) $('pb').value = 'Alarm ' + almLabel(a) + ($('maUnit').value ? ' (' + $('maUnit').value + ')' : '');
+  }
+  $('maUnit').addEventListener('change', function () { fillAlmSelects(); });
+  $('maAlarm').addEventListener('change', onAlarm);
+  // บันทึก alarm ลงคิวของ Machine Manual (ส่ง manual.log) พร้อมเลขใบแจ้งซ่อม
+  function queueAlarm(item) {
+    if (!MAN_CUR || $('almBox').hidden || !$('maAlarm').value) return null;
+    var a = { submit_id: 'mr' + item.submitId, machine_id: MAN_CUR.machine_id, equipment_no: item.eq, model_id: MAN_CUR.model_id, site: item.site,
+              unit: $('maUnit').value, date: item.date, time: item.t1, alarm_id: $('maAlarm').value, stalled_step_id: $('maStep').value, faulty_io_id: $('maIo').value,
+              cause: item.cause, action: item.sol, recorded_by: item.tech, note: 'จากใบแจ้งซ่อม', repair_id: item.id };
+    MAN_OUT.push(a); Store.set('manual.outbox', MAN_OUT).catch(function () {});
+    var al = almOf(item); if (al) item.almTxt = al.txt;
+    return a;
+  }
+  function syncMan() {
+    if (manSyncing || !MAN_OUT.length || !navigator.onLine || !Api.ready() || !Api.pin()) return;
+    manSyncing = true;
+    var a = MAN_OUT[0];
+    call('manual.log', { payload: a }, 60000).then(function (res) {
+      MAN_OUT = MAN_OUT.filter(function (x) { return x.submit_id !== a.submit_id; });
+      if (MAN && res.machine_id && !(MAN.machine || []).some(function (x) { return x.machine_id === res.machine_id; })) (MAN.machine = MAN.machine || []).push({ machine_id: res.machine_id, model_id: a.model_id, machine_no: a.equipment_no, location: a.site || '', status: 'Active' });
+      if (MAN && !res.duplicate) { MAN.alarm_log = [Object.assign({ log_id: res.log_id }, a, { machine_id: res.machine_id || a.machine_id })].concat(MAN.alarm_log || []); Store.set('manual.db', MAN).catch(function () {}); }
+      return Store.set('manual.outbox', MAN_OUT).then(function () { manSyncing = false; if (MAN_OUT.length) syncMan(); });
+    }, function () { manSyncing = false; });
+  }
+  function almOf(r) {
+    if (!r) return null;
+    var hit = MAN_OUT.filter(function (x) { return x.repair_id === r.id; })[0] || ((MAN && MAN.alarm_log) || []).filter(function (x) { return x.repair_id === r.id; })[0];
+    if (!hit) return null;
+    var f = function (t, k, v) { return ((MAN && MAN[t]) || []).filter(function (x) { return x[k] === v; })[0]; };
+    var al = f('alarm_code', 'alarm_id', hit.alarm_id), st = hit.stalled_step_id && f('cycle_step', 'step_id', hit.stalled_step_id), io = hit.faulty_io_id && f('io_point', 'io_id', hit.faulty_io_id);
+    return { log: hit, txt: [almLabel(al) || hit.alarm_id, hit.unit, st ? 'Step ' + st.seq + '. ' + st.step_th : '', io ? 'Sensor ' + io.symbol + ' ' + io.name_th : ''].filter(Boolean).join(' · ') };
+  }
   $('sec').addEventListener('change', function () { $('secOtherF').hidden = $('sec').value !== OTHER; });
 
   // ย่อรูปก่อนเก็บ/ส่ง: ไม่เกิน ~60 KB ต่อรูป (เดิม ~200 KB) — ลดคุณภาพก่อน ถ้ายังใหญ่ค่อยลดขนาดภาพ
@@ -316,7 +423,7 @@
     var d = r.date.split('-');
     return ['[แจ้งซ่อม] ' + r.id].concat(r.jobId ? ['งาน: ' + r.jobId] : [], ['ช่าง: ' + r.tech, 'วันที่: ' + d[2] + '/' + d[1] + '/' + d[0] + '  เวลา ' + r.t1 + ' - ' + r.t2,
       'Downtime: ' + r.hr + ' ชม. (' + r.mins + ' นาที)', '', 'เครื่อง: ' + r.eq, r.desc, 'Model ' + r.model + (r.sn ? ' | S/N ' + r.sn : ''), '',
-      'ปัญหาที่ได้รับแจ้ง: ' + r.pb, 'Sector: ' + r.sec, 'Cause: ' + r.cause, 'Reason: ' + r.reason, 'Solution: ' + r.sol])
+      'ปัญหาที่ได้รับแจ้ง: ' + r.pb].concat(r.almTxt ? ['Alarm: ' + r.almTxt] : [], ['Sector: ' + r.sec, 'Cause: ' + r.cause, 'Reason: ' + r.reason, 'Solution: ' + r.sol]))
       .concat(links && links.p1 ? ['รูปปัญหา: ' + links.p1] : [], links && links.p2 ? ['รูปหลังแก้ไข: ' + links.p2] : []).join('\n');
   }
   function assignText(j) {
@@ -335,6 +442,7 @@
       msg = 'จ่ายงานให้ ' + item.tech + ' แล้ว';
     } else {
       item = collect();
+      queueAlarm(item);
       remember({ submitId: item.submitId, id: item.id, eq: item.eq, at: item.sub, text: lineText(item, {}), hasPhoto: !!(item.p1 || item.p2), sent: false, rec: slim(item), links: {} });
       msg = MODE === 'close' ? 'ปิดงาน ' + item.jobId + ' แล้ว' : 'บันทึกแล้ว';
     }
@@ -513,6 +621,11 @@
     box.querySelectorAll('[data-open]').forEach(function (b) {
       b.onclick = function () { DETAIL = b.dataset.open; show('detail'); };
     });
+    if (PENDING_R) {                       // เปิดจาก Machine Manual: repair.html#r=<Report ID>
+      var hit = listItems().filter(function (x) { return x.id === PENDING_R; })[0];
+      if (hit) { PENDING_R = ''; DETAIL = hit.submitId; try { history.replaceState(null, '', location.pathname); } catch (_) {} show('detail'); }
+      else if (!ALL_LOADING) { $('admStat').textContent = 'ไม่พบใบ ' + PENDING_R + ' ในช่วงวันที่ที่เลือก — ขยายช่วงวันที่แล้วลองใหม่'; PENDING_R = ''; }
+    }
   }
   $('q').addEventListener('input', function () { renderList(); });
   $('bReload').onclick = function () { loadAll(true); };
@@ -546,7 +659,11 @@
         '<div class="row">' + val('Machine type', r.type) + val('หมายเลขเครื่อง', r.eq) + '</div>' +
         '<div class="info"><div><span>Description</span><b>' + esc(r.desc || '—') + '</b></div><div><span>Site</span><b>' + esc(r.site || '—') + '</b></div>' +
         '<div><span>Model</span><b>' + esc(r.model || '—') + '</b></div><div><span>Serial no.</span><b>' + esc(r.sn || '—') + '</b></div></div>' +
-        val('ปัญหาที่ได้รับแจ้ง', r.pb) + '</section>';
+        val('ปัญหาที่ได้รับแจ้ง', r.pb) + (function () {
+          var al = almOf(r); if (!al) return '';
+          return '<a class="almlink" href="manual.html?eq=' + encodeURIComponent(r.eq) + '&log=' + encodeURIComponent(al.log.log_id || '') + '">&#128214; Alarm: <b>' + esc(al.txt) + '</b>' +
+            (al.log.log_id ? ' <span class="note">(' + esc(al.log.log_id) + ')</span>' : ' <span class="note">(รอส่ง)</span>') + '</a>';
+        })() + '</section>';
       if (!asg) html += '<section class="card"><h2><span class="n">3</span>ผลการตรวจและแก้ไข</h2>' +
         val('Sector (ส่วนของเครื่อง)', r.sec) + val('Cause of problem', r.cause) +
         picBox('Picture of problem', L.p1, q.p1, r.hasP1) +
@@ -568,6 +685,7 @@
 
   /* ---------- ส่งคิว ---------- */
   function sync(manual, tries) {
+    syncMan();
     if (syncing || !OUTBOX.length || !navigator.onLine || !Api.ready() || !Api.pin()) return;
     tries = tries || 0;
     if (tries >= OUTBOX.length) return;                 // ลองครบทุกรายการแล้วในรอบนี้

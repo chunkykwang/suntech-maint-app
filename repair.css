@@ -116,3 +116,10 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn:focus-visib
 .shacts .btn{flex:1 1 160px;min-height:52px;font-size:16px}
 .shnext{display:flex;flex-wrap:wrap;gap:8px;margin:4px 2px 20px}.shnext .btn{flex:1 1 150px}
 .shacts{display:flex;gap:8px;flex-wrap:wrap}
+
+/* เชื่อม Machine Manual */
+.almbox{border:1px solid var(--ln);border-left:5px solid #8a4b2a;border-radius:10px;padding:10px 12px;margin:0 0 12px;background:var(--chip)}
+.almhd{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:4px}
+.almhd a{color:var(--red);font-weight:700;font-size:14px}
+.almtip{font-size:13px;background:var(--panel);border-radius:8px;padding:8px 10px;margin-bottom:8px;white-space:pre-wrap}
+.almlink{display:block;border:1px solid var(--ln);border-left:5px solid #8a4b2a;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:14px;color:var(--ink);text-decoration:none;background:var(--chip)}

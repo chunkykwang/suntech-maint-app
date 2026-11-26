@@ -9,7 +9,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link rel="stylesheet" href="repair.css?v=20261126b">
+<link rel="stylesheet" href="repair.css?v=20261126c">
 </head>
 <body>
 <header>
@@ -60,6 +60,19 @@
         <div class="f"><label for="eq">หมายเลขเครื่อง <span class="req">*</span></label><select id="eq" required disabled><option value="">— เลือกประเภทก่อน —</option></select><span class="err"></span></div>
       </div>
       <div class="info" id="info" hidden></div>
+      <div class="almbox" id="almBox" hidden>
+        <div class="almhd"><b>&#128214; Alarm code (Machine Manual)</b><a id="almLink" href="manual.html">เปิดคู่มือ ↗</a></div>
+        <p class="note" style="margin:0 0 8px">ถ้าเครื่องขึ้น alarm ให้เลือก code — บันทึกลง Alarm log ของเครื่องพร้อมเลขใบนี้</p>
+        <div class="row">
+          <div class="f"><label for="maUnit">Unit</label><select id="maUnit"></select></div>
+          <div class="f"><label for="maAlarm">Alarm code</label><select id="maAlarm"></select></div>
+        </div>
+        <div id="almMore" hidden>
+          <div class="almtip" id="almTip"></div>
+          <div class="f"><label for="maStep">Step ที่ค้าง (ดูก่อนกด RESET)</label><select id="maStep"></select></div>
+          <div class="f"><label for="maIo">Sensor / I/O ที่ผิดปกติ</label><select id="maIo"></select></div>
+        </div>
+      </div>
       <div class="f"><label for="pb">ปัญหาที่ได้รับแจ้ง <span class="req">*</span></label><textarea id="pb" required placeholder="อาการที่ผู้แจ้งบอก เช่น Vacuum pump Thermal relay trip"></textarea><span class="err"></span></div>
       <div class="f" id="refF" hidden><label id="refL">รูปตัวอย่างหน้างาน <span class="opt">(ไม่บังคับ · สูงสุด 3 รูป)</span></label>
         <div class="refs" id="refs"></div>
@@ -156,11 +169,11 @@
 <div class="toast" id="toast" role="status"></div>
 <div class="lightbox" id="lb" hidden><img id="lbImg" alt="รูปตัวอย่างหน้างาน"><button type="button" class="btn" id="lbX">ปิด</button></div>
 
-<script src="config.js?v=20261126b"></script>
-<script src="store.js?v=20261126b"></script>
-<script src="session.js?v=20261126b"></script>
-<script src="api.js?v=20261126b"></script>
-<script src="repair.js?v=20261126b"></script>
+<script src="config.js?v=20261126c"></script>
+<script src="store.js?v=20261126c"></script>
+<script src="session.js?v=20261126c"></script>
+<script src="api.js?v=20261126c"></script>
+<script src="repair.js?v=20261126c"></script>
 <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
 </body>
 </html>

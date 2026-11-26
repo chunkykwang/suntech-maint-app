@@ -13,6 +13,16 @@
   function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } }
   try { SEL = JSON.parse(ls('man_sel') || '{}') || {}; } catch (_) { SEL = {}; }
   TAB = ls('man_tab') || 'alarm';
+  var FRESH = false, URLQ = null; try { URLQ = new URLSearchParams(location.search); } catch (_) {}
+  // เปิดจากใบแจ้งซ่อม: manual.html?eq=<Equipment No.>&log=<log_id>
+  function applyUrl() {
+    if (!URLQ || !DB) return;
+    var eq = URLQ.get('eq'), mc = eq && T('machine').filter(function (m) { return m.machine_no === eq; })[0];
+    if (!mc && !FRESH) return;                                  // รอข้อมูลล่าสุดจากเซิร์ฟเวอร์ก่อน (เครื่องที่เพิ่งเพิ่มจากใบแจ้งซ่อม)
+    if (mc) { var md = byId('model', 'model_id', mc.model_id); SEL = { type: md ? md.type_id : '', model: mc.model_id, machine: mc.machine_id }; saveSel(); }
+    if (URLQ.get('log')) TAB = 'log';
+    URLQ = null; try { history.replaceState(null, '', location.pathname); } catch (_) {}
+  }
 
   /* ---------- เน็ต / PIN / toast ---------- */
   function paint() {
@@ -280,6 +290,7 @@
         (io ? '<div>Sensor: <b>' + esc(io.symbol) + '</b> ' + esc(io.name_th) + ' <span class="mu">' + esc(io.address) + '</span></div>' : '') +
         (r.cause ? '<div>สาเหตุ: ' + esc(r.cause) + '</div>' : '') + (r.action ? '<div>แก้ไข: ' + esc(r.action) + '</div>' : '') +
         (miss ? '<div class="miss">ไม่ได้บันทึก step / sensor ที่ค้าง</div>' : '') +
+        (r.repair_id ? '<a class="rlink" href="repair.html#r=' + encodeURIComponent(r.repair_id) + '">ใบแจ้งซ่อม ' + esc(r.repair_id) + ' ↗</a>' : '') +
         '<div class="mu">' + esc([r.recorded_by, r.note, r.log_id].filter(Boolean).join(' · ')) + '</div></div>';
     }).join('') : '<div class="empty">ยังไม่มีบันทึก alarm ของเครื่องนี้</div>';
   }
@@ -308,10 +319,20 @@
     $('lTime').value = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
     ['lCause', 'lAction', 'lNote'].forEach(function (k) { $(k).value = ''; });
     $('lWho').textContent = Session.user();
+    var eqNo = (curMachine() || {}).machine_no;
+    $('bLogRepair').disabled = !eqNo;
+    $('repNote').textContent = eqNo ? 'กด "บันทึกพร้อมใบแจ้งซ่อม" = เปิดใบแจ้งซ่อมของ ' + eqNo + ' ที่กรอก alarm ไว้ให้ แล้วบันทึก alarm ตอนส่งใบ (เชื่อมเลขใบให้เอง)'
+      : 'เครื่องนี้ยังไม่มีเลขเครื่อง (machine_no) ใน Machine Manual DB จึงเปิดใบแจ้งซ่อมจากที่นี่ไม่ได้ — EE เติม machine_no = Equipment No. ก่อน';
     fillStepIo();
     show('form');
   }
   $('lUnit').onchange = fillStepIo;
+  $('bLogRepair').onclick = function () {
+    if (!$('lAlarm').value) { toast('เลือก alarm code ก่อน'); $('lAlarm').focus(); return; }
+    var q = new URLSearchParams({ new: '1', eq: curMachine().machine_no, alarm: $('lAlarm').value, unit: $('lUnit').value,
+      step: $('lStep').value, io: $('lIo').value, cause: $('lCause').value.trim(), action: $('lAction').value.trim() });
+    location.href = 'repair.html?' + q.toString();
+  };
   $('bCancelLog').onclick = function () { show('machine'); tab(TAB); };
   $('bSaveLog').onclick = function () {
     if (!$('lAlarm').value) { toast('เลือก alarm code ก่อน'); $('lAlarm').focus(); return; }
@@ -351,13 +372,14 @@
     if (!DB) { $('err').hidden = false; $('err').textContent = navigator.onLine ? 'โหลดข้อมูลคู่มือไม่ได้' : 'ยังไม่มีข้อมูลในเครื่อง — เปิดหน้านี้ตอนมีเน็ตอย่างน้อย 1 ครั้ง'; return; }
     $('err').hidden = true; paint();
     if (VIEW === 'form') return;
+    applyUrl();
     if (SEL.machine && curMachine()) openMachine(); else if (SEL.noAuto) renderPickNoAuto(); else renderPick();
   }
   function load() {
     if (!navigator.onLine || !Api.ready()) return;
     var go = function () {
       call('manual.init', {}, 60000).then(function (d) {
-        DB = d; Store.set('manual.db', d).catch(function () {}); render();
+        DB = d; FRESH = true; Store.set('manual.db', d).catch(function () {}); render();
       }, function (er) {
         if (!DB) { $('loading').hidden = true; $('err').hidden = false; $('err').textContent = 'โหลดข้อมูลคู่มือไม่ได้: ' + er.message; }
         else toast('อัปเดตข้อมูลไม่ได้: ' + er.message);
